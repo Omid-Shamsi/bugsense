@@ -1,0 +1,31 @@
+{
+  "name": "frontend",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "typecheck": "nuxi typecheck",
+    "test:unit": "vitest run",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.42",
+    "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "@nuxt/test-utils": "^4.3.2",
+    "@playwright/test": "^1.63.0",
+    "@vue/test-utils": "^2.5.0",
+    "happy-dom": "^20.14.5",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.1",
+    "vue-tsc": "^3.3.11"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
