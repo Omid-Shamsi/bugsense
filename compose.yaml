@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bugsense}
+      POSTGRES_USER: ${POSTGRES_USER:-bugsense}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bugsense}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bugsense} -d ${POSTGRES_DB:-bugsense}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB:-bugsense}
+      DB_USERNAME: ${POSTGRES_USER:-bugsense}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bugsense}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+      - backend_vendor:/app/vendor
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "composer install --no-interaction --prefer-dist &&
+      php artisan serve --host=0.0.0.0 --port=8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+    command: >
+      sh -c "test -f node_modules/.package-lock.json || npm ci &&
+      npm run dev -- --host=0.0.0.0"
+
+volumes:
+  postgres_data:
+  backend_vendor:
+  frontend_node_modules:
