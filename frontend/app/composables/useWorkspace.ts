@@ -10,10 +10,6 @@ export interface VisibleProject {
 
 let observerAttached = false
 
-function roleLabel(role: string): string {
-  return role.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
 export function useWorkspace() {
   const api = useApi()
   const session = useSession()
@@ -28,8 +24,8 @@ export function useWorkspace() {
     return session.user.value?.memberships.find((membership) => membership.active && membership.project.key === key) || null
   })
   const selectedRoles = computed(() => {
-    if (selectedMembership.value) return selectedMembership.value.roles.map(roleLabel)
-    return session.user.value?.is_system_admin ? ['System Admin'] : []
+    if (selectedMembership.value) return selectedMembership.value.roles
+    return session.user.value?.is_system_admin ? ['system_admin'] : []
   })
 
   function clear() {

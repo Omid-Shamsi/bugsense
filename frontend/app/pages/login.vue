@@ -25,12 +25,12 @@ async function submit() {
     if (error instanceof ApiError) {
       fieldErrors.value = error.fieldErrors
       formError.value = error.kind === 'csrf'
-        ? 'Security check expired. Please try again.'
+        ? 'مهلت بررسی امنیتی پایان یافته است. دوباره تلاش کنید.'
         : error.kind === 'network'
-          ? 'Cannot reach BugSense. Check connection and try again.'
-          : error.problem?.detail || 'Unable to sign in. Please try again.'
+          ? 'ارتباط با BugSense برقرار نشد. اتصال را بررسی و دوباره تلاش کنید.'
+          : error.problem?.detail || 'ورود امکان‌پذیر نبود. دوباره تلاش کنید.'
     } else {
-      formError.value = 'Unable to sign in. Please try again.'
+      formError.value = 'ورود امکان‌پذیر نبود. دوباره تلاش کنید.'
     }
   } finally {
     submitting.value = false
@@ -43,8 +43,8 @@ async function signOut() {
     await session.logout()
   } catch (error) {
     formError.value = error instanceof ApiError && error.kind === 'csrf'
-      ? 'Security check expired. Please try again.'
-      : 'Unable to sign out. Please try again.'
+      ? 'مهلت بررسی امنیتی پایان یافته است. دوباره تلاش کنید.'
+      : 'خروج امکان‌پذیر نبود. دوباره تلاش کنید.'
   }
 }
 </script>
@@ -59,37 +59,37 @@ async function signOut() {
 
       <template v-if="session.isAuthenticated.value && session.user.value">
         <div class="auth-heading">
-          <p class="eyebrow">Session active</p>
-          <h1 id="login-title">You are signed in</h1>
-          <p>{{ session.user.value.display_name || session.user.value.email }}</p>
+          <p class="eyebrow">نشست فعال</p>
+          <h1 id="login-title">شما وارد شده‌اید</h1>
+          <p :dir="session.user.value.display_name ? undefined : 'ltr'">{{ session.user.value.display_name || session.user.value.email }}</p>
         </div>
-        <button class="button button-secondary" type="button" @click="signOut">Sign out</button>
+        <button class="button button-secondary" type="button" @click="signOut">خروج</button>
       </template>
 
       <template v-else>
         <div class="auth-heading">
-          <p class="eyebrow">Workspace access</p>
-          <h1 id="login-title">Sign in to BugSense</h1>
-          <p>Use your provisioned account to continue.</p>
+          <p class="eyebrow">دسترسی به فضای کاری</p>
+          <h1 id="login-title">ورود به BugSense</h1>
+          <p>برای ادامه از حساب کاربری خود استفاده کنید.</p>
         </div>
 
         <form novalidate @submit.prevent="submit">
           <div v-if="formError" class="form-error" role="alert">{{ formError }}</div>
 
           <div class="field">
-            <label for="email">Email address</label>
-            <input id="email" v-model.trim="email" :disabled="submitting" autocomplete="email" inputmode="email" name="email" type="email" required aria-describedby="email-error">
+            <label for="email">ایمیل</label>
+            <input id="email" v-model.trim="email" dir="ltr" :disabled="submitting" autocomplete="email" inputmode="email" name="email" type="email" required aria-describedby="email-error">
             <p v-if="fieldErrors.email?.[0]" id="email-error" class="field-error">{{ fieldErrors.email[0] }}</p>
           </div>
 
           <div class="field">
-            <label for="password">Password</label>
+            <label for="password">رمز عبور</label>
             <input id="password" v-model="password" :disabled="submitting" autocomplete="current-password" name="password" type="password" required aria-describedby="password-error">
             <p v-if="fieldErrors.password?.[0]" id="password-error" class="field-error">{{ fieldErrors.password[0] }}</p>
           </div>
 
           <button class="button button-primary" :disabled="submitting" type="submit">
-            {{ submitting ? 'Signing in…' : 'Sign in' }}
+            {{ submitting ? 'در حال ورود…' : 'ورود' }}
           </button>
         </form>
       </template>

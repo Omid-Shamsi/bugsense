@@ -54,7 +54,7 @@ class UserController extends AdministrationController
         $data = $request->validated();
 
         if (($data['active'] ?? null) === false) {
-            $user = $deactivateAction->handle($request->user(), $user);
+            $user = $deactivateAction->handle($request->user(), $user, (array) $request->input('remediation', []));
         } else {
             unset($data['active']);
             $user = $action->handle($request->user(), $user, $data);

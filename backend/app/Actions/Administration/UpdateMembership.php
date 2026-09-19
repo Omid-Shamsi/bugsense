@@ -72,7 +72,7 @@ class UpdateMembership
             foreach ($toRevoke as $role) {
                 $roleRow = $membership->roles()->where('role', $role->value)->where('is_active', true)->first();
                 if ($roleRow !== null) {
-                    app(DeactivateMembershipRole::class)->handle($actor, $roleRow);
+                    app(DeactivateMembershipRole::class)->handle($actor, $roleRow, (array) ($data['remediation'] ?? []));
                 }
             }
 

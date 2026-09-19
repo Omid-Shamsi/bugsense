@@ -1,0 +1,2 @@
+BugSense T060 evidence fixture.
+This small plain-text file verifies private authenticated upload and download.

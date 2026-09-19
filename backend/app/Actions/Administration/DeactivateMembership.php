@@ -2,23 +2,35 @@
 
 namespace App\Actions\Administration;
 
+use App\Actions\Administration\Concerns\RemediatesBugAssignments;
 use App\Actions\Concerns\RecordsActivity;
+use App\Models\Bug;
 use App\Models\Membership;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class DeactivateMembership
 {
-    use RecordsActivity;
+    use RecordsActivity, RemediatesBugAssignments;
 
     /**
-     * No open Bug work can reference a membership yet (the Bug domain does
-     * not exist in this phase), so there is no remediation to enforce here.
-     * A later phase (T032) extends this once assignment exists.
+     * @param  array<string, mixed>  $remediation
      */
-    public function handle(User $actor, Membership $membership): Membership
+    public function handle(User $actor, Membership $membership, array $remediation = []): Membership
     {
-        return DB::transaction(function () use ($actor, $membership) {
+        return DB::transaction(function () use ($actor, $membership, $remediation) {
+            $affectedBugs = Bug::open()
+                ->where('assignee_membership_id', $membership->id)
+                ->lockForUpdate()
+                ->get();
+
+            $this->remediateAssignments(
+                $actor,
+                $affectedBugs,
+                $remediation,
+                'Remediation for deactivated assignee Membership.',
+            );
+
             $before = $membership->only(['is_active']);
 
             $membership->is_active = false;

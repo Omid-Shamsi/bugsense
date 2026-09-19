@@ -8,6 +8,14 @@ export default defineNuxtConfig({
     enabled: true
   },
 
+  components: [{ path: '~/components', pathPrefix: false }],
+
+  app: {
+    head: {
+      htmlAttrs: { lang: 'fa', dir: 'rtl' }
+    }
+  },
+
   runtimeConfig: {
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8000/api/v1',

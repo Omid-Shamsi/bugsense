@@ -2,6 +2,7 @@
 
 namespace App\Actions\Administration;
 
+use App\Actions\Administration\Concerns\RemediatesBugClassifications;
 use App\Actions\Concerns\RecordsActivity;
 use App\Models\TrackingValue;
 use App\Models\User;
@@ -9,16 +10,16 @@ use Illuminate\Support\Facades\DB;
 
 class DeactivateTrackingValue
 {
-    use RecordsActivity;
+    use RecordsActivity, RemediatesBugClassifications;
 
     /**
-     * No Bug can reference a tracking value yet (the Bug domain does not
-     * exist in this phase), so there is no open-work remediation to enforce
-     * here. A later phase (T032) extends this once Bugs exist.
+     * @param  array<string, mixed>  $remediation
      */
-    public function handle(User $actor, TrackingValue $trackingValue): TrackingValue
+    public function handle(User $actor, TrackingValue $trackingValue, array $remediation = []): TrackingValue
     {
-        return DB::transaction(function () use ($actor, $trackingValue) {
+        return DB::transaction(function () use ($actor, $trackingValue, $remediation) {
+            $this->remediateClassification($actor, $trackingValue, $remediation);
+
             $before = $trackingValue->only(['is_active']);
 
             $trackingValue->is_active = false;

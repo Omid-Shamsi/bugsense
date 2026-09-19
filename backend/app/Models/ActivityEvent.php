@@ -51,6 +51,11 @@ class ActivityEvent extends Model
         return $this->belongsTo(User::class, 'actor_id');
     }
 
+    public function bug(): BelongsTo
+    {
+        return $this->belongsTo(Bug::class);
+    }
+
     /**
      * Enforce append-only history at the model boundary: a row may be
      * inserted once and never updated afterward.

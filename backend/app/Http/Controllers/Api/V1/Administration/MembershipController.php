@@ -46,8 +46,9 @@ class MembershipController extends AdministrationController
         $data = $request->validated();
 
         if (($data['active'] ?? null) === false) {
-            $membership = $deactivateAction->handle($request->user(), $membership);
+            $membership = $deactivateAction->handle($request->user(), $membership, (array) $request->input('remediation', []));
         } else {
+            $data['remediation'] = (array) $request->input('remediation', []);
             $membership = $action->handle($request->user(), $membership, $data);
         }
 
