@@ -4,6 +4,8 @@ export default defineNuxtConfig({
 
   ssr: false,
 
+  modules: ['@nuxt/ui'],
+
   devtools: {
     enabled: true
   },
@@ -14,6 +16,15 @@ export default defineNuxtConfig({
     head: {
       htmlAttrs: { lang: 'fa', dir: 'rtl' }
     }
+  },
+
+  colorMode: {
+    preference: 'dark',
+    fallback: 'dark'
+  },
+
+  ui: {
+    fonts: false
   },
 
   runtimeConfig: {

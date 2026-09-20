@@ -35,6 +35,11 @@ class BugResource extends JsonResource
             'severity' => $this->severity ? TrackingValueResource::make($this->severity) : null,
             'tags' => TrackingValueResource::collection($this->tags),
             'active_resolution' => $this->activeResolutionAttempt ? ResolutionAttemptResource::make($this->activeResolutionAttempt) : null,
+            'open_information_request' => $this->openInformationRequest ? [
+                'request_text' => $this->openInformationRequest->request_text,
+                'requested_at' => $this->openInformationRequest->requested_at,
+                'requested_by' => UserSummaryResource::make($this->openInformationRequest->requestedBy),
+            ] : null,
             // Prior attempts stay readable here even after active_resolution
             // is cleared on rejection/reopen — this is the Phase 7/8
             // resolution record itself, not the Phase 9 activity timeline.

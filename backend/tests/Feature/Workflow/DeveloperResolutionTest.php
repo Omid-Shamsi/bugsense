@@ -216,6 +216,12 @@ it('lets only the assigned eligible Developer record Fixed from In Progress', fu
     $response->assertJsonPath('data.status', 'qa_verification');
     $response->assertJsonPath('data.active_resolution.outcome', 'fixed');
     $response->assertJsonPath('data.active_resolution.attempt_number', 1);
+    $response->assertJsonPath('data.active_resolution.explanation', 'Added a null check before dereferencing the session.');
+    $response->assertJsonPath('data.active_resolution.qa_instructions', 'Log in on Safari and confirm the dashboard loads.');
+    $response->assertJsonPath('data.active_resolution.recorded_by.id', $developer->id);
+    $response->assertJsonPath('data.active_resolution.reproduction_attempts', null);
+    $response->assertJsonPath('data.active_resolution.reproduction_environment', null);
+    $response->assertJsonPath('data.active_resolution.decision_rationale', null);
 });
 
 it('denies Fixed resolution to a non-assignee Developer', function () {
@@ -341,6 +347,14 @@ it('lets an Admin within scope record Cannot Reproduce with its required evidenc
     $response->assertOk();
     $response->assertJsonPath('data.status', 'qa_verification');
     $response->assertJsonPath('data.active_resolution.outcome', 'cannot_reproduce');
+    $response->assertJsonPath('data.active_resolution.reproduction_attempts', 'Tried on Chrome, Firefox, and Safari.');
+    $response->assertJsonPath('data.active_resolution.reproduction_environment', 'macOS 15, all major browsers.');
+    $response->assertJsonPath('data.active_resolution.decision_rationale', null);
+
+    $detail = $this->actingAs($admin)->getJson("/api/v1/bugs/{$bug->public_id}");
+    $detail->assertOk();
+    $detail->assertJsonPath('data.active_resolution.reproduction_attempts', 'Tried on Chrome, Firefox, and Safari.');
+    $detail->assertJsonPath('data.resolution_attempts.0.reproduction_environment', 'macOS 15, all major browsers.');
 })->with(['review', 'assigned', 'in_progress']);
 
 it('rejects Cannot Reproduce missing attempted_steps or environment', function () {
@@ -370,6 +384,13 @@ it('lets an Admin within scope record Wont Fix with its decision rationale', fun
 
     $response->assertOk();
     $response->assertJsonPath('data.active_resolution.outcome', 'wont_fix');
+    $response->assertJsonPath('data.active_resolution.reproduction_attempts', null);
+    $response->assertJsonPath('data.active_resolution.reproduction_environment', null);
+    $response->assertJsonPath('data.active_resolution.decision_rationale', 'Working as intended per design doc v2.');
+
+    $detail = $this->actingAs($admin)->getJson("/api/v1/bugs/{$bug->public_id}");
+    $detail->assertOk();
+    $detail->assertJsonPath('data.resolution_attempts.0.decision_rationale', 'Working as intended per design doc v2.');
 });
 
 it('rejects Wont Fix missing a decision rationale', function () {

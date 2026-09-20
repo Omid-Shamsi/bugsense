@@ -487,6 +487,32 @@ it('lists Bugs awaiting verification for an eligible independent QA', function (
     expect(collect($response->json('data'))->pluck('id'))->toContain($bug->id);
 });
 
+it('includes non-fix evidence in the QA verification queue', function () {
+    $project = Project::factory()->create();
+    $admin = qaAdmin($project);
+    $qa = qaQA($project);
+    $reporter = qaReporter($project);
+    $bug = Bug::factory()->for($project)->for($reporter, 'reporter')->create(['status' => 'review']);
+
+    $this->actingAs($admin)->postJson("/api/v1/bugs/{$bug->public_id}/non-fix-resolutions", [
+        'outcome' => 'cannot_reproduce',
+        'reason' => 'Could not reproduce.',
+        'attempted_steps' => 'Retried the documented checkout flow three times.',
+        'environment' => 'Firefox 143 on Ubuntu 26.04.',
+    ])->assertOk();
+
+    $response = $this->actingAs($qa)->getJson('/api/v1/bugs/qa-queue');
+
+    $response->assertOk();
+    $row = collect($response->json('data'))->firstWhere('id', $bug->id);
+    expect($row['active_resolution'])->toMatchArray([
+        'outcome' => 'cannot_reproduce',
+        'reproduction_attempts' => 'Retried the documented checkout flow three times.',
+        'reproduction_environment' => 'Firefox 143 on Ubuntu 26.04.',
+        'decision_rationale' => null,
+    ]);
+});
+
 it('excludes from the queue a resolution the QA user recorded themselves', function () {
     $project = Project::factory()->create();
     $developerQA = User::factory()->create();

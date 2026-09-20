@@ -24,7 +24,7 @@ class BugController extends Controller
     public function assignedToMe(Request $request)
     {
         $bugs = (new AssignedDeveloperBugs())->forUser($request->user())
-            ->with(['project', 'reporter', 'category', 'priority', 'severity', 'tags', 'assigneeMembership.user', 'activeResolutionAttempt.recordedBy'])
+            ->with(['project', 'reporter', 'category', 'priority', 'severity', 'tags', 'assigneeMembership.user', 'activeResolutionAttempt.recordedBy', 'openInformationRequest.requestedBy'])
             ->orderByDesc('updated_at')
             ->get();
 
@@ -46,7 +46,7 @@ class BugController extends Controller
     {
         abort_unless((new VisibleBugs())->forUser($request->user())->whereKey($bug->id)->exists(), 404);
 
-        return BugResource::make($bug->load(['project', 'reporter', 'category', 'priority', 'severity', 'tags', 'assigneeMembership.user', 'activeResolutionAttempt.recordedBy']));
+        return BugResource::make($bug->load(['project', 'reporter', 'category', 'priority', 'severity', 'tags', 'assigneeMembership.user', 'activeResolutionAttempt.recordedBy', 'openInformationRequest.requestedBy']));
     }
 
     public function update(UpdateBugRequest $request, Bug $bug, UpdateBug $action)

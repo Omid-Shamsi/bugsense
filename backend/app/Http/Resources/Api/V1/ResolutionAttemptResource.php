@@ -25,6 +25,9 @@ class ResolutionAttemptResource extends JsonResource
             'outcome' => $this->outcome->value,
             'explanation' => $this->explanation,
             'qa_instructions' => $this->qa_instructions,
+            'reproduction_attempts' => $this->reproduction_attempts,
+            'reproduction_environment' => $this->reproduction_environment,
+            'decision_rationale' => $this->decision_rationale,
             'recorded_by' => UserSummaryResource::make($this->recordedBy),
             'recorded_at' => $this->recorded_at,
             'qa_result' => $this->qaVerificationResult ? [

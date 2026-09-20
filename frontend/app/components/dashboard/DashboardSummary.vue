@@ -35,27 +35,43 @@ function duration(milliseconds: number): string {
 
 <template>
   <section class="dashboard-results" :aria-busy="loading">
-    <p v-if="loading" class="panel-copy" role="status">در حال بارگیری داشبورد…</p>
-    <div v-else-if="error" class="form-error dashboard-error" role="alert">
-      <span>{{ error }}</span>
-      <button class="text-button" type="button" @click="$emit('retry')">تلاش مجدد</button>
+    <div v-if="loading" class="dashboard-loading" role="status">
+      <span class="sr-only">در حال بارگیری داشبورد…</span>
+      <USkeleton v-for="index in 5" :key="index" class="h-24 rounded-xl" />
+    </div>
+    <div v-else-if="error" class="dashboard-error" role="alert">
+      <UAlert
+        color="error"
+        variant="subtle"
+        icon="i-lucide-circle-alert"
+        title="بارگیری داشبورد انجام نشد"
+        :description="error"
+      />
+      <span class="sr-only">{{ error }}</span>
+      <button class="dashboard-retry" type="button" @click="$emit('retry')">تلاش مجدد</button>
     </div>
     <template v-else-if="summary">
-      <div v-if="summary.counts.total === 0" class="work-empty dashboard-empty">
-        <h3>باگی با این فیلترها مطابقت ندارد</h3>
-        <p>خلاصه نتایج برای مجموعه فعلی قابل دسترسی، خالی است.</p>
-      </div>
-
-      <section class="dashboard-section" aria-labelledby="dashboard-counts-heading">
-        <div class="dashboard-section-heading"><div><p class="eyebrow">مجموع سرور</p><h2 id="dashboard-counts-heading">تعدادها</h2></div><time :datetime="summary.context.generated_at">تولیدشده در {{ formatDateTime(summary.context.generated_at) }}</time></div>
-        <div class="summary-card-grid">
-          <article v-for="card in countCards" :key="card.key" class="summary-card">
-            <span>{{ card.label }}</span><strong>{{ formatNumber(summary.counts[card.key]) }}</strong>
-          </article>
+      <UCard v-if="summary.counts.total === 0" variant="subtle" class="dashboard-empty">
+        <div class="dashboard-empty-content">
+          <span class="dashboard-empty-icon"><UIcon name="i-lucide-search-x" /></span>
+          <div><h3>باگی با این فیلترها مطابقت ندارد</h3><p>خلاصه نتایج برای مجموعه فعلی قابل دسترسی، خالی است.</p></div>
         </div>
-      </section>
+      </UCard>
 
-      <section class="dashboard-section resolution-summary" aria-labelledby="resolution-time-heading">
+      <UCard class="dashboard-section" aria-labelledby="dashboard-counts-heading" :ui="{ body: 'p-5 sm:p-6' }">
+        <div class="dashboard-section-heading">
+          <div><p class="eyebrow">مجموع سرور</p><h2 id="dashboard-counts-heading">شاخص‌های وضعیت</h2></div>
+          <time :datetime="summary.context.generated_at"><UIcon name="i-lucide-clock-3" />تولیدشده در {{ formatDateTime(summary.context.generated_at) }}</time>
+        </div>
+        <div class="summary-card-grid">
+          <UCard v-for="card in countCards" :key="card.key" variant="subtle" class="summary-card" :ui="{ body: 'p-4' }">
+            <span>{{ card.label }}</span>
+            <strong>{{ formatNumber(summary.counts[card.key]) }}</strong>
+          </UCard>
+        </div>
+      </UCard>
+
+      <UCard class="dashboard-section resolution-summary" aria-labelledby="resolution-time-heading" :ui="{ body: 'p-5 sm:p-6 dashboard-resolution-body' }">
         <div>
           <p class="eyebrow">زمان‌بندی نتیجه</p>
           <h2 id="resolution-time-heading">میانگین زمان رفع</h2>
@@ -68,17 +84,17 @@ function duration(milliseconds: number): string {
           <span v-else>نمونه تکمیل‌شده‌ای وجود ندارد</span>
         </div>
         <p class="resolution-outcomes">نتیجه‌های لحاظ‌شده: {{ summary.average_resolution_time.included_outcomes.map(resolutionLabel).join('، ') }}</p>
-      </section>
+      </UCard>
 
-      <section class="dashboard-section" aria-labelledby="dashboard-breakdowns-heading">
+      <UCard class="dashboard-section" aria-labelledby="dashboard-breakdowns-heading" :ui="{ body: 'p-5 sm:p-6' }">
         <div class="dashboard-section-heading"><div><p class="eyebrow">ترکیب</p><h2 id="dashboard-breakdowns-heading">تفکیک</h2></div></div>
         <div class="breakdown-grid">
-          <article class="breakdown-card"><h3>شدت</h3><ul><li v-for="row in summary.breakdowns.severity" :key="row.id || 'unset'"><span>{{ specialDisplayLabel(row.name) }}</span><strong>{{ formatNumber(row.count) }}</strong></li></ul><p v-if="!summary.breakdowns.severity.length" class="muted">باگ مطابقی وجود ندارد</p></article>
-          <article class="breakdown-card"><h3>دسته‌بندی</h3><ul><li v-for="row in summary.breakdowns.category" :key="row.id || 'unset'"><span>{{ specialDisplayLabel(row.name) }}</span><strong>{{ formatNumber(row.count) }}</strong></li></ul><p v-if="!summary.breakdowns.category.length" class="muted">باگ مطابقی وجود ندارد</p></article>
-          <article class="breakdown-card"><h3>پروژه</h3><ul><li v-for="row in summary.breakdowns.project" :key="row.id"><span><bdi dir="ltr">{{ row.key }}</bdi> · {{ row.name }}</span><strong>{{ formatNumber(row.count) }}</strong></li></ul><p v-if="!summary.breakdowns.project.length" class="muted">باگ مطابقی وجود ندارد</p></article>
-          <article class="breakdown-card"><h3>توسعه‌دهنده</h3><ul><li v-for="row in summary.breakdowns.developer" :key="row.id || 'unassigned'"><span>{{ specialDisplayLabel(row.display_name) }}</span><strong>{{ formatNumber(row.count) }}</strong></li></ul><p v-if="!summary.breakdowns.developer.length" class="muted">باگ مطابقی وجود ندارد</p></article>
+          <UCard variant="subtle" class="breakdown-card" :ui="{ body: 'p-4' }"><h3><UIcon name="i-lucide-shield-alert" />شدت</h3><ul><li v-for="row in summary.breakdowns.severity" :key="row.id || 'unset'"><span>{{ specialDisplayLabel(row.name) }}</span><strong>{{ formatNumber(row.count) }}</strong></li></ul><p v-if="!summary.breakdowns.severity.length" class="muted">باگ مطابقی وجود ندارد</p></UCard>
+          <UCard variant="subtle" class="breakdown-card" :ui="{ body: 'p-4' }"><h3><UIcon name="i-lucide-tags" />دسته‌بندی</h3><ul><li v-for="row in summary.breakdowns.category" :key="row.id || 'unset'"><span>{{ specialDisplayLabel(row.name) }}</span><strong>{{ formatNumber(row.count) }}</strong></li></ul><p v-if="!summary.breakdowns.category.length" class="muted">باگ مطابقی وجود ندارد</p></UCard>
+          <UCard variant="subtle" class="breakdown-card" :ui="{ body: 'p-4' }"><h3><UIcon name="i-lucide-folder-kanban" />پروژه</h3><ul><li v-for="row in summary.breakdowns.project" :key="row.id"><span><bdi dir="ltr">{{ row.key }}</bdi> · {{ row.name }}</span><strong>{{ formatNumber(row.count) }}</strong></li></ul><p v-if="!summary.breakdowns.project.length" class="muted">باگ مطابقی وجود ندارد</p></UCard>
+          <UCard variant="subtle" class="breakdown-card" :ui="{ body: 'p-4' }"><h3><UIcon name="i-lucide-user-round" />توسعه‌دهنده</h3><ul><li v-for="row in summary.breakdowns.developer" :key="row.id || 'unassigned'"><span>{{ specialDisplayLabel(row.display_name) }}</span><strong>{{ formatNumber(row.count) }}</strong></li></ul><p v-if="!summary.breakdowns.developer.length" class="muted">باگ مطابقی وجود ندارد</p></UCard>
         </div>
-      </section>
+      </UCard>
     </template>
   </section>
 </template>

@@ -113,7 +113,29 @@ it('lets an Admin within scope request information from Review', function () {
 
     $response->assertOk();
     $response->assertJsonPath('data.status', 'needs_information');
+    $response->assertJsonPath('data.open_information_request.request_text', 'Please attach a screenshot.');
+    $response->assertJsonPath('data.open_information_request.requested_by.id', $admin->id);
+    $response->assertJsonPath('data.open_information_request.requested_by.display_name', $admin->display_name);
+    expect($response->json('data.open_information_request.requested_at'))->not->toBeNull();
+
+    $detail = $this->actingAs($admin)->getJson("/api/v1/bugs/{$bug->public_id}");
+    $detail->assertOk();
+    $detail->assertJsonPath('data.open_information_request.request_text', 'Please attach a screenshot.');
+    $detail->assertJsonPath('data.open_information_request.requested_by.active', true);
     expect($bug->informationRequests()->count())->toBe(1);
+});
+
+it('returns a null open information request for a normal bug detail response', function () {
+    $project = Project::factory()->create();
+    $reporter = wfReporter($project);
+    $bug = wfBug($project, $reporter, 'submitted');
+
+    $response = $this->actingAs($reporter)->getJson("/api/v1/bugs/{$bug->public_id}");
+
+    $response->assertOk();
+    $response->assertJsonPath('data.id', $bug->id);
+    $response->assertJsonPath('data.status', 'submitted');
+    $response->assertJsonPath('data.open_information_request', null);
 });
 
 it('rejects a blank information request', function () {
@@ -169,6 +191,11 @@ it('lets the Reporter respond and automatically returns the bug to Review', func
 
     $response->assertOk();
     $response->assertJsonPath('data.status', 'review');
+    $response->assertJsonPath('data.open_information_request', null);
+
+    $detail = $this->actingAs($reporter)->getJson("/api/v1/bugs/{$bug->public_id}");
+    $detail->assertOk();
+    $detail->assertJsonPath('data.open_information_request', null);
     $openRequest = $bug->informationRequests()->latest('requested_at')->first();
     expect($openRequest->response_text)->toBe('Here is the detail you asked for.');
     expect($openRequest->responded_by_id)->toBe($reporter->id);

@@ -12,7 +12,7 @@ class QAVerificationQueueController extends Controller
     public function index(Request $request)
     {
         $bugs = (new QAVerificationQueue())->forUser($request->user())
-            ->with(['project', 'reporter', 'category', 'priority', 'severity', 'tags', 'assigneeMembership.user', 'activeResolutionAttempt.recordedBy'])
+            ->with(['project', 'reporter', 'category', 'priority', 'severity', 'tags', 'assigneeMembership.user', 'activeResolutionAttempt.recordedBy', 'openInformationRequest.requestedBy'])
             ->orderByDesc('updated_at')
             ->get();
 

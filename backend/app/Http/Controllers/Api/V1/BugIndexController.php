@@ -27,7 +27,7 @@ class BugIndexController extends Controller
         $perPage = min((int) $request->integer('per_page', 25), 100);
 
         $bugs = $query
-            ->with(['project', 'reporter', 'category', 'priority', 'severity', 'tags', 'assigneeMembership.user', 'activeResolutionAttempt.recordedBy'])
+            ->with(['project', 'reporter', 'category', 'priority', 'severity', 'tags', 'assigneeMembership.user', 'activeResolutionAttempt.recordedBy', 'openInformationRequest.requestedBy'])
             ->paginate($perPage);
 
         return BugResource::collection($bugs);

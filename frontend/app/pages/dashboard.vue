@@ -87,16 +87,33 @@ void load()
 
 <template>
   <main class="admin-page dashboard-page">
-    <header class="admin-header">
-      <div><p class="eyebrow">گزارش‌دهی</p><h1>داشبورد</h1><p>خلاصه‌های محاسبه‌شده در سرور برای باگ‌های مجاز و فیلترهای انتخابی.</p><p class="workspace-context">فضای کاری: {{ workspaceContext }}. این انتخاب مجوزهای سرور را تغییر نمی‌دهد.</p></div>
-      <NuxtLink class="admin-link" :to="{ path: '/bugs', query: filtersToRouteQuery(filters, 'dashboard') }">مشاهده باگ‌های مطابق</NuxtLink>
+    <header class="admin-header dashboard-page-header">
+      <div>
+        <p class="eyebrow">گزارش‌دهی</p>
+        <h1>نمای کلی باگ‌ها</h1>
+        <p>خلاصه‌های محاسبه‌شده در سرور برای باگ‌های مجاز و فیلترهای انتخابی.</p>
+        <div class="dashboard-context-row">
+          <UBadge color="neutral" variant="subtle" icon="i-lucide-folder-kanban">{{ workspaceContext }}</UBadge>
+          <span>انتخاب فضای کاری مجوزهای سرور را تغییر نمی‌دهد.</span>
+        </div>
+      </div>
+      <UButton
+        :to="{ path: '/bugs', query: filtersToRouteQuery(filters, 'dashboard') }"
+        color="neutral"
+        variant="outline"
+        icon="i-lucide-list-filter"
+        label="مشاهده باگ‌های مطابق"
+      />
     </header>
 
-    <section class="admin-panel filter-shell">
-      <div class="panel-title"><div><h2>فیلترهای داشبورد</h2><p class="panel-copy">از همان جستجو و قالب فیلتر فهرست باگ‌ها استفاده می‌کند.</p></div></div>
+    <UCard class="filter-shell dashboard-filter-card" :ui="{ body: 'p-5 sm:p-6' }">
+      <div class="panel-title">
+        <div><h2>فیلترهای داشبورد</h2><p class="panel-copy">از همان جستجو و قالب فیلتر فهرست باگ‌ها استفاده می‌کند.</p></div>
+        <UIcon name="i-lucide-sliders-horizontal" class="dashboard-card-icon" />
+      </div>
       <p v-if="optionsError" class="admin-notice admin-notice--error" role="alert">همه گزینه‌های فیلتر بارگیری نشد: {{ optionsError }}</p>
       <BugFilters :model-value="filters" :projects="workspace.projects.value" :tracking-values="trackingValues" :user-id="session.user.value?.id" :list-mode="false" :pending="loading" :options-loading="optionsLoading" @apply="setFilters" @reset="setFilters" />
-    </section>
+    </UCard>
 
     <DashboardSummary :summary="summary" :loading="loading" :error="error" @retry="load" />
   </main>
