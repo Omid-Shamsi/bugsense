@@ -6,7 +6,7 @@ import { actionLabel, formatDateTime, formatNumber, resolutionLabel, statusLabel
 
 type NonFixOutcome = NonFixResolutionData['outcome']
 
-const props = defineProps<{ bug: BugReport }>()
+const props = defineProps<{ bug: BugReport; activeAction: 'add_progress' | 'resolve_fixed' | 'resolve_non_fix' }>()
 const emit = defineEmits<{
   changed: [bug: BugReport]
   refresh: []
@@ -33,7 +33,7 @@ const hasWorkflowAction = computed(() => actions.value.some((action) => [
   'resolve_fixed',
   'resolve_non_fix',
 ].includes(action)))
-const visible = computed(() => hasWorkflowAction.value || props.bug.active_resolution !== null)
+const visible = computed(() => actions.value.includes(props.activeAction))
 
 async function mutate(name: string, operation: () => Promise<{ data: BugReport }>, clear?: () => void) {
   if (pending.value) return
@@ -135,17 +135,7 @@ function submitNonFix() {
       <p class="muted resolution-note">بررسی QA یک مرحله جداگانه است؛ این بخش باگ را تأیید یا بسته نمی‌کند.</p>
     </article>
 
-    <div v-if="actions.includes('start_work')" class="workflow-block">
-      <div>
-        <h3>شروع کار</h3>
-        <p>این باگ تخصیص‌یافته را با وضعیت فعلی سرور وارد حالت در حال انجام می‌کند.</p>
-      </div>
-      <button class="button button-primary workflow-button" :disabled="!!pending" @click="mutate('start', () => bugs.startWork(bug.public_id))">
-        {{ pending === 'start' ? 'در حال شروع…' : actionLabel('start_work') }}
-      </button>
-    </div>
-
-    <form v-if="actions.includes('add_progress')" class="workflow-block workflow-form" @submit.prevent="mutate('progress', () => bugs.addProgress(bug.public_id, progressBody), () => { progressBody = '' })">
+    <form v-if="activeAction === 'add_progress' && actions.includes('add_progress')" class="workflow-block workflow-form" @submit.prevent="mutate('progress', () => bugs.addProgress(bug.public_id, progressBody), () => { progressBody = '' })">
       <label for="progress-body">گزارش پیشرفت <span class="required-mark">الزامی</span></label>
       <p>یک به‌روزرسانی توسعه اضافه کنید. گزارش‌های قبلی قابل ویرایش نیستند.</p>
       <textarea id="progress-body" v-model="progressBody" rows="4" required :disabled="!!pending" :aria-invalid="!!fieldErrors.body" aria-describedby="progress-body-error" />
@@ -155,7 +145,7 @@ function submitNonFix() {
       </button>
     </form>
 
-    <form v-if="actions.includes('resolve_fixed')" class="workflow-block workflow-form" @submit.prevent="mutate('fixed', () => bugs.resolveFixed(bug.public_id, fixedExplanation, qaInstructions), () => { fixedExplanation = ''; qaInstructions = '' })">
+    <form v-if="activeAction === 'resolve_fixed' && actions.includes('resolve_fixed')" class="workflow-block workflow-form" @submit.prevent="mutate('fixed', () => bugs.resolveFixed(bug.public_id, fixedExplanation, qaInstructions), () => { fixedExplanation = ''; qaInstructions = '' })">
       <div>
         <h3>ثبت به‌عنوان رفع‌شده</h3>
         <p>این کار یک تلاش رفع ثبت می‌کند و باگ را برای بررسی QA می‌فرستد. باگ در این مرحله بسته نمی‌شود.</p>
@@ -173,7 +163,7 @@ function submitNonFix() {
       </button>
     </form>
 
-    <form v-if="actions.includes('resolve_non_fix')" class="workflow-block workflow-form" @submit.prevent="submitNonFix">
+    <form v-if="activeAction === 'resolve_non_fix' && actions.includes('resolve_non_fix')" class="workflow-block workflow-form" @submit.prevent="submitNonFix">
       <div>
         <h3>ثبت نتیجه غیراصلاحی</h3>
         <p>نتیجه را انتخاب و مدارک لازم برای آن را وارد کنید.</p>

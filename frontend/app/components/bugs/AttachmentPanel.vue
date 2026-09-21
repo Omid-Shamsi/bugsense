@@ -19,6 +19,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const uploadPending = ref(false)
 const removingId = ref<string | null>(null)
 const downloadingId = ref<string | null>(null)
+const removalCandidate = ref<BugAttachment | null>(null)
 const canManage = computed(() => props.bug.allowed_actions.includes('edit'))
 const mutationPending = computed(() => uploadPending.value || removingId.value !== null)
 
@@ -121,6 +122,17 @@ async function remove(attachment: BugAttachment): Promise<void> {
   }
 }
 
+function requestRemoval(attachment: BugAttachment): void {
+  if (attachment.state === 'ready' && canManage.value && !mutationPending.value) removalCandidate.value = attachment
+}
+
+async function confirmRemoval(): Promise<void> {
+  const attachment = removalCandidate.value
+  if (!attachment) return
+  removalCandidate.value = null
+  await remove(attachment)
+}
+
 watch(() => props.bug.public_id, () => {
   selectedFile.value = null
   actionError.value = ''
@@ -168,7 +180,7 @@ watch(() => props.bug.public_id, () => {
             class="text-button text-button--danger"
             type="button"
             :disabled="mutationPending"
-            @click="remove(attachment)"
+            @click="requestRemoval(attachment)"
           >{{ removingId === attachment.id ? 'در حال حذف…' : actionLabel('remove') }}</button>
         </div>
       </li>
@@ -199,4 +211,8 @@ watch(() => props.bug.public_id, () => {
       </button>
     </div>
   </section>
+  <UModal :open="!!removalCandidate" title="حذف پیوست" :description="`دسترسی عادی به «${removalCandidate?.original_name || ''}» حذف می‌شود و بازیابی فوری ندارد.`" @update:open="open => { if (!open) removalCandidate = null }">
+    <template #body><p>متادیتا و تاریخچهٔ این پیوست حفظ می‌شود.</p></template>
+    <template #footer><UButton color="neutral" variant="ghost" @click="removalCandidate = null">انصراف</UButton><UButton color="error" :loading="removingId !== null" @click="confirmRemoval">حذف پیوست</UButton></template>
+  </UModal>
 </template>

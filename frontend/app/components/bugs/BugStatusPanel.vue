@@ -4,7 +4,7 @@ import { ApiError } from '~/plugins/api.client'
 import { bugErrorMessage, useBugs, type BugReport } from '~/composables/useBugs'
 import { actionLabel, decisionLabel, formatDateTime, formatNumber, resolutionLabel, statusLabel } from '~/utils/presentation'
 
-const props = defineProps<{ bug: BugReport }>()
+const props = defineProps<{ bug: BugReport; activeAction: 'resume_work' | 'renew_review' | 'reopen'; showAttempts?: boolean }>()
 const emit = defineEmits<{
   changed: [bug: BugReport]
   refresh: []
@@ -19,7 +19,7 @@ const reopenReason = ref('')
 const actions = computed(() => props.bug.allowed_actions)
 const attempts = computed(() => props.bug.resolution_attempts || [])
 const hasReopenedAction = computed(() => actions.value.includes('resume_work') || actions.value.includes('renew_review'))
-const visible = computed(() => props.bug.status === 'reopened' || actions.value.includes('reopen') || attempts.value.length > 0)
+const visible = computed(() => actions.value.includes(props.activeAction))
 
 async function mutate(name: string, operation: () => Promise<{ data: BugReport }>, clear?: () => void) {
   if (pending.value) return
@@ -65,7 +65,7 @@ async function mutate(name: string, operation: () => Promise<{ data: BugReport }
       <p v-else>این باگ بازگشایی شده، اما فعلاً اقدام بعدی برای حساب شما مجاز نیست.</p>
     </div>
 
-    <div v-if="actions.includes('resume_work')" class="workflow-block">
+    <div v-if="activeAction === 'resume_work' && actions.includes('resume_work')" class="workflow-block">
       <div>
         <h3>ادامه توسعه</h3>
         <p>پس از رد تلاش رفع، تخصیص فعلی را ادامه دهید. این دستور تخصیص را تغییر نمی‌دهد.</p>
@@ -75,7 +75,7 @@ async function mutate(name: string, operation: () => Promise<{ data: BugReport }
       </button>
     </div>
 
-    <div v-if="actions.includes('renew_review')" class="workflow-block">
+    <div v-if="activeAction === 'renew_review' && actions.includes('renew_review')" class="workflow-block">
       <div>
         <h3>بازگشت به بررسی مدیر</h3>
         <p>این باگ بازگشایی‌شده را به حالت بررسی بازمی‌گرداند. تخصیص توسعه‌دهنده اقدامی جداگانه است.</p>
@@ -85,7 +85,7 @@ async function mutate(name: string, operation: () => Promise<{ data: BugReport }
       </button>
     </div>
 
-    <form v-if="actions.includes('reopen')" class="workflow-block workflow-form" @submit.prevent="mutate('reopen', () => bugs.reopen(bug.public_id, reopenReason), () => { reopenReason = '' })">
+    <form v-if="activeAction === 'reopen' && actions.includes('reopen')" class="workflow-block workflow-form" @submit.prevent="mutate('reopen', () => bugs.reopen(bug.public_id, reopenReason), () => { reopenReason = '' })">
       <div>
         <h3>بازگشایی باگ بسته‌شده</h3>
         <p>دلیل نیاز به بررسی مجدد مدیر را ثبت کنید.</p>
@@ -98,7 +98,7 @@ async function mutate(name: string, operation: () => Promise<{ data: BugReport }
       </button>
     </form>
 
-    <div v-if="attempts.length" class="attempt-history">
+    <div v-if="showAttempts && attempts.length" class="attempt-history">
       <div class="attempt-history-heading">
         <h3>تلاش‌های رفع</h3>
         <span>{{ formatNumber(attempts.length) }}</span>

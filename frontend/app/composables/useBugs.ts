@@ -63,9 +63,17 @@ export interface ResolutionAttempt {
   outcome: ResolutionOutcome
   explanation: string
   qa_instructions: string | null
+  reproduction_attempts: string | null
+  reproduction_environment: string | null
+  decision_rationale: string | null
   recorded_by: BugUserSummary
   recorded_at: string
   qa_result: QAVerificationResult | null
+}
+export interface OpenInformationRequest {
+  request_text: string
+  requested_at: string
+  requested_by: BugUserSummary
 }
 export interface BugReport {
   id: string
@@ -87,6 +95,7 @@ export interface BugReport {
   severity: BugTrackingValue | null
   tags: BugTrackingValue[]
   active_resolution: ResolutionAttempt | null
+  open_information_request: OpenInformationRequest | null
   resolution_attempts: ResolutionAttempt[]
   created_at: string
   updated_at: string

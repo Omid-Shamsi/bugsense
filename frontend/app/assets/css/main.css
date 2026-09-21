@@ -23,7 +23,7 @@ textarea, select { font: inherit; }
 
 .auth-page {
   align-items: center;
-  background: radial-gradient(circle at 50% 0%, rgba(79, 140, 255, .09), transparent 34rem), #0b0f14;
+  background: #0b0f14;
   display: flex;
   justify-content: center;
   min-height: 100vh;
@@ -34,7 +34,7 @@ textarea, select { font: inherit; }
   background: #111820;
   border: 1px solid #26313d;
   border-radius: 12px;
-  box-shadow: 0 20px 55px rgba(0, 0, 0, .22);
+  box-shadow: none;
   padding: 32px;
   width: min(100%, 420px);
 }

@@ -16,6 +16,7 @@ const success = ref('')
 const fieldErrors = ref<Record<string, string[]>>({})
 const type = ref<BugRelationshipType>('related_to')
 const targetBugId = ref('')
+const deactivationCandidate = ref<BugRelationship | null>(null)
 let requestVersion = 0
 
 const relationshipTypes: { value: BugRelationshipType; label: string }[] = [
@@ -105,6 +106,17 @@ async function deactivate(relationship: BugRelationship) {
   }
 }
 
+function requestDeactivation(relationship: BugRelationship): void {
+  if (!pending.value) deactivationCandidate.value = relationship
+}
+
+async function confirmDeactivation(): Promise<void> {
+  const relationship = deactivationCandidate.value
+  if (!relationship) return
+  deactivationCandidate.value = null
+  await deactivate(relationship)
+}
+
 watch(() => props.bug.public_id, () => {
   relationships.value = []
   success.value = ''
@@ -142,7 +154,7 @@ watch(() => props.bug.public_id, () => {
           ایجادشده در {{ formatDateTime(relationship.created_at) }}
           <template v-if="relationship.created_by?.display_name"> توسط {{ relationship.created_by.display_name }}</template>
         </p>
-        <button v-if="canManage" class="text-button relationship-deactivate" type="button" :disabled="!!pending" @click="deactivate(relationship)">
+        <button v-if="canManage" class="text-button relationship-deactivate" type="button" :disabled="!!pending" @click="requestDeactivation(relationship)">
           {{ pending === relationship.id ? 'در حال غیرفعال‌سازی…' : actionLabel('deactivate') }}
         </button>
       </li>
@@ -167,4 +179,8 @@ watch(() => props.bug.public_id, () => {
       </button>
     </form>
   </section>
+  <UModal :open="!!deactivationCandidate" title="غیرفعال‌سازی ارتباط" :description="`ارتباط با ${deactivationCandidate ? relatedBugId(deactivationCandidate) : ''} از فهرست فعال حذف می‌شود و بازیابی فوری ندارد.`" @update:open="open => { if (!open) deactivationCandidate = null }">
+    <template #body><p>تاریخچهٔ ارتباط حفظ می‌شود.</p></template>
+    <template #footer><UButton color="neutral" variant="ghost" @click="deactivationCandidate = null">انصراف</UButton><UButton color="error" :loading="!!pending" @click="confirmDeactivation">غیرفعال‌سازی</UButton></template>
+  </UModal>
 </template>

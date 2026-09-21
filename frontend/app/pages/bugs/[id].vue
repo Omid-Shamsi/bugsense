@@ -4,7 +4,9 @@ import { bugErrorMessage, bugToForm, useBugs, type BugFormData, type BugReport, 
 import { formatDateTime, statusLabel } from '~/utils/presentation'
 
 definePageMeta({ middleware: 'auth' })
+type DetailTab = 'attachments' | 'relationships' | 'attempts' | 'activity'
 const route = useRoute()
+const router = useRouter()
 const bugs = useBugs()
 const bug = ref<BugReport | null>(null)
 const trackingValues = ref<BugTrackingValue[]>([])
@@ -14,77 +16,63 @@ const pending = ref(false)
 const error = ref('')
 const fieldErrors = ref<Record<string, string[]>>({})
 const traceabilityRevision = ref(0)
+const activeAction = ref<string | null>(null)
+const success = ref('')
 const publicId = computed(() => String(route.params.id).toUpperCase())
 const canEdit = computed(() => bug.value?.allowed_actions.includes('edit') || false)
-
-async function load() {
-  loading.value = true; error.value = ''
-  try { bug.value = (await bugs.get(publicId.value)).data } catch (caught) { error.value = bugErrorMessage(caught) } finally { loading.value = false }
-}
-
-async function refreshAfterCommand(updated: BugReport) {
-  bug.value = updated
-  await refreshCurrentBug('عملیات موفق بود، اما به‌روزرسانی گزارش ناموفق بود. ')
-}
-
-async function refreshCurrentBug(errorPrefix = '') {
-  error.value = ''
-  try { bug.value = (await bugs.get(publicId.value)).data } catch (caught) { error.value = `${errorPrefix}${bugErrorMessage(caught)}` } finally { traceabilityRevision.value += 1 }
-}
-
-async function startEditing() {
-  if (!bug.value || !canEdit.value) return
-  editing.value = true; error.value = ''; fieldErrors.value = {}
-  try { trackingValues.value = (await bugs.trackingValues(bug.value.project.key)).data } catch (caught) { error.value = bugErrorMessage(caught) }
-}
-
+const selectedTab = computed<DetailTab>({
+  get: () => ['attachments', 'relationships', 'attempts', 'activity'].includes(String(route.query.tab)) ? route.query.tab as DetailTab : 'attachments',
+  set: tab => { void router.replace({ query: { ...route.query, tab } }) },
+})
+const actionLabels: Record<string, string> = { edit: 'ویرایش گزارش', begin_review: 'شروع بررسی', request_information: 'درخواست اطلاعات', respond_information: 'پاسخ اطلاعاتی', assign: 'تخصیص توسعه‌دهنده', set_priority: 'تغییر اولویت', set_severity: 'تغییر شدت', start_work: 'شروع کار', add_progress: 'ثبت پیشرفت', resolve_fixed: 'ثبت رفع', resolve_non_fix: 'ثبت نتیجهٔ غیر‌اصلاحی', verify: 'تصمیم QA', resume_work: 'ادامهٔ کار', renew_review: 'بازگشت به بررسی', reopen: 'بازگشایی' }
+const actionGroup: Record<string, string> = { edit: 'گزارش', begin_review: 'تریاژ', request_information: 'تریاژ', respond_information: 'تریاژ', set_priority: 'طبقه‌بندی', set_severity: 'طبقه‌بندی', assign: 'تخصیص', start_work: 'توسعه', add_progress: 'توسعه', resolve_fixed: 'توسعه', resolve_non_fix: 'تریاژ', verify: 'QA', resume_work: 'چرخهٔ عمر', renew_review: 'چرخهٔ عمر', reopen: 'چرخهٔ عمر' }
+const actionGroups = computed(() => {
+  const groups = new Map<string, string[]>()
+  for (const action of bug.value?.allowed_actions || []) { const group = actionGroup[action] || 'اقدامات'; groups.set(group, [...(groups.get(group) || []), action]) }
+  return [...groups.entries()].map(([label, actions]) => ({ label, actions }))
+})
+const latestRejectedAttempt = computed(() => [...(bug.value?.resolution_attempts || [])].reverse().find(attempt => attempt.qa_result?.decision === 'rejected'))
+const handoff = computed(() => ({ submitted: 'در انتظار شروع بررسی مدیر.', needs_information: 'در انتظار پاسخ گزارش‌دهنده.', assigned: 'در انتظار شروع کار توسط مسئول فعلی.', in_progress: 'کار در اختیار مسئول فعلی است.', qa_verification: 'نتیجهٔ رفع ثبت شده و در انتظار تصمیم مستقل QA است.', reopened: 'آخرین نتیجه در QA رد شده و مسیر بازگشت باید تعیین شود.', closed: 'نتیجه توسط QA تأیید و باگ بسته شده است.' } as Record<string, string>)[bug.value?.status || ''] || '')
+function unavailableMessage(caught: unknown) { return caught instanceof ApiError && caught.status === 404 ? 'این باگ در دسترس نیست یا وجود ندارد.' : bugErrorMessage(caught) }
+async function load() { loading.value = true; error.value = ''; try { bug.value = (await bugs.get(publicId.value)).data } catch (caught) { error.value = unavailableMessage(caught) } finally { loading.value = false } }
+async function refreshCurrentBug(prefix: string | Event = '') { const message = typeof prefix === 'string' ? prefix : ''; error.value = ''; try { bug.value = (await bugs.get(publicId.value)).data } catch (caught) { error.value = `${message}${unavailableMessage(caught)}` } finally { traceabilityRevision.value += 1 } }
+async function refreshAfterCommand(updated: BugReport) { bug.value = updated; activeAction.value = null; success.value = `عملیات ثبت شد. وضعیت فعلی: ${statusLabel(updated.status)}.`; await refreshCurrentBug('عملیات موفق بود، اما به‌روزرسانی گزارش ناموفق بود. ') }
+async function startEditing() { if (!bug.value || !canEdit.value) return; editing.value = true; activeAction.value = 'edit'; error.value = ''; fieldErrors.value = {}; try { trackingValues.value = (await bugs.trackingValues(bug.value.project.key)).data } catch (caught) { error.value = bugErrorMessage(caught) } }
 async function update(value: BugFormData) {
   if (!bug.value || pending.value) return
-  const original = bugToForm(bug.value)
-  const changes: Record<string, unknown> = {}
+  const original = bugToForm(bug.value); const changes: Record<string, unknown> = {}
   for (const field of ['title', 'description'] as const) if (value[field] !== original[field]) changes[field] = value[field]
   for (const field of ['steps_to_reproduce', 'expected_result', 'actual_result', 'environment', 'platform', 'application_version', 'category_id'] as const) if (value[field] !== original[field]) changes[field] = value[field] || null
   if ([...value.tag_ids].sort().join('|') !== [...original.tag_ids].sort().join('|')) changes.tag_ids = value.tag_ids
-
-  if (!Object.keys(changes).length) { editing.value = false; return }
+  if (!Object.keys(changes).length) { editing.value = false; activeAction.value = null; return }
   pending.value = true; error.value = ''; fieldErrors.value = {}
-  try {
-    bug.value = (await bugs.update(publicId.value, changes)).data
-    editing.value = false
-    traceabilityRevision.value += 1
-  } catch (caught) {
-    if (caught instanceof ApiError) fieldErrors.value = caught.fieldErrors
-    if (!(caught instanceof ApiError) || caught.status !== 422) error.value = bugErrorMessage(caught)
-  } finally { pending.value = false }
+  try { bug.value = (await bugs.update(publicId.value, changes)).data; editing.value = false; activeAction.value = null; traceabilityRevision.value += 1; success.value = 'ویرایش گزارش ثبت شد.' } catch (caught) { if (caught instanceof ApiError) fieldErrors.value = caught.fieldErrors; if (!(caught instanceof ApiError) || caught.status !== 422) error.value = bugErrorMessage(caught) } finally { pending.value = false }
 }
-
+function selectAction(action: string) { success.value = ''; if (action === 'edit') { void startEditing(); return }; editing.value = false; activeAction.value = activeAction.value === action ? null : action }
+function triageAction(action: string): action is 'begin_review' | 'request_information' | 'respond_information' | 'set_priority' | 'set_severity' { return ['begin_review', 'request_information', 'respond_information', 'set_priority', 'set_severity'].includes(action) }
+function developmentAction(action: string): action is 'add_progress' | 'resolve_fixed' | 'resolve_non_fix' { return ['add_progress', 'resolve_fixed', 'resolve_non_fix'].includes(action) }
+function lifecycleAction(action: string): action is 'resume_work' | 'renew_review' | 'reopen' { return ['resume_work', 'renew_review', 'reopen'].includes(action) }
+async function startWork() { if (!bug.value || pending.value) return; pending.value = true; error.value = ''; try { await refreshAfterCommand((await bugs.startWork(bug.value.public_id)).data) } catch (caught) { error.value = bugErrorMessage(caught) } finally { pending.value = false } }
 await load()
 </script>
 
 <template>
-  <main class="bug-page">
-    <p v-if="loading" class="panel-copy">در حال بارگیری گزارش…</p>
-    <div v-else-if="error && !bug" class="form-error" role="alert">{{ error }}</div>
-    <template v-else-if="bug">
-      <header class="bug-page-header"><div><p class="eyebrow">{{ bug.project.name }} · <bdi dir="ltr">{{ bug.project.key }}</bdi></p><div class="bug-title-row"><h1 dir="ltr">{{ bug.public_id }}</h1><span :class="['bug-status', `bug-status--${bug.status}`]">{{ statusLabel(bug.status) }}</span></div><p>{{ bug.title }}</p></div><button v-if="canEdit && !editing" class="admin-link button-reset" @click="startEditing">ویرایش گزارش</button></header>
-      <p v-if="error && !editing" class="form-error" role="alert">{{ error }}</p>
-
-      <section v-if="editing" class="bug-panel"><BugForm mode="edit" :allowed-actions="bug.allowed_actions" :initial-value="bugToForm(bug)" :tracking-values="trackingValues" :field-errors="fieldErrors" :error="error" :pending="pending" @submit="update"><template #attachments><AttachmentPanel embedded :bug="bug" @changed="traceabilityRevision += 1" /></template></BugForm><button class="text-button cancel-edit" :disabled="pending" @click="editing = false">انصراف</button></section>
-
-      <template v-else>
-        <section class="bug-detail-grid"><article class="bug-panel bug-report"><h2>گزارش</h2><div class="report-field"><h3>توضیحات</h3><p>{{ bug.description }}</p></div><div v-if="bug.steps_to_reproduce" class="report-field"><h3>مراحل بازتولید</h3><p>{{ bug.steps_to_reproduce }}</p></div><div v-if="bug.expected_result" class="report-field"><h3>نتیجه مورد انتظار</h3><p>{{ bug.expected_result }}</p></div><div v-if="bug.actual_result" class="report-field"><h3>نتیجه فعلی</h3><p>{{ bug.actual_result }}</p></div><div v-if="bug.environment" class="report-field"><h3>محیط</h3><p>{{ bug.environment }}</p></div></article>
-          <aside class="bug-panel bug-meta"><h2>جزئیات</h2><dl><div><dt>گزارش‌دهنده</dt><dd>{{ bug.reporter.display_name }}</dd></div><div><dt>مسئول</dt><dd>{{ bug.assignee?.display_name || 'بدون مسئول' }}</dd></div><div><dt>دسته‌بندی</dt><dd>{{ bug.category?.name || 'تعیین‌نشده' }}</dd></div><div><dt>اولویت</dt><dd>{{ bug.priority?.name || 'تعیین‌نشده' }}</dd></div><div><dt>شدت</dt><dd>{{ bug.severity?.name || 'تعیین‌نشده' }}</dd></div><div><dt>سکو</dt><dd>{{ bug.platform || 'تعیین‌نشده' }}</dd></div><div><dt>نسخه برنامه</dt><dd dir="ltr">{{ bug.application_version || 'تعیین‌نشده' }}</dd></div><div><dt>زمان ایجاد</dt><dd>{{ formatDateTime(bug.created_at) }}</dd></div><div><dt>آخرین به‌روزرسانی</dt><dd>{{ formatDateTime(bug.updated_at) }}</dd></div></dl><div class="report-field"><h3>برچسب‌ها</h3><div v-if="bug.tags.length" class="bug-tags"><span v-for="tag in bug.tags" :key="tag.id">{{ tag.name }}</span></div><p v-else class="muted">بدون برچسب</p></div></aside>
-        </section>
-        <AttachmentPanel :bug="bug" @changed="traceabilityRevision += 1" />
-        <div class="workflow-grid"><TriagePanel :bug="bug" @changed="refreshAfterCommand" /><AssignmentPanel :bug="bug" @changed="refreshAfterCommand" /></div>
-        <ResolutionPanel :bug="bug" @changed="refreshAfterCommand" @refresh="refreshCurrentBug" />
-        <VerificationPanel :bug="bug" @changed="refreshAfterCommand" @refresh="refreshCurrentBug" />
-        <BugStatusPanel :bug="bug" @changed="refreshAfterCommand" @refresh="refreshCurrentBug" />
-        <div class="traceability-grid">
-          <RelationshipPanel :bug="bug" @changed="traceabilityRevision += 1" />
-          <ActivityTimeline :bug-id="bug.public_id" :refresh-key="traceabilityRevision" />
-        </div>
-      </template>
+  <main class="detail-page">
+    <div v-if="loading" class="detail-skeleton" aria-busy="true" aria-live="polite"><span class="sr-only">در حال بارگیری باگ…</span><USkeleton class="h-5 w-48" /><USkeleton class="h-8 w-2/3" /><div class="detail-skeleton__strip"><USkeleton v-for="index in 4" :key="index" class="h-20" /></div><div class="detail-skeleton__body"><USkeleton class="h-64" /><USkeleton class="h-64" /></div></div>
+    <section v-else-if="!bug" class="detail-unavailable"><UAlert color="error" variant="subtle" :title="error || 'این باگ در دسترس نیست یا وجود ندارد.'" /><div><UButton to="/bugs" color="neutral" variant="outline">بازگشت به فهرست باگ‌ها</UButton><UButton v-if="error && !error.includes('در دسترس نیست')" color="primary" variant="ghost" @click="load">تلاش مجدد</UButton></div></section>
+    <template v-else>
+      <header class="detail-identity"><ProjectIdentity :name="bug.project.name" :project-key="bug.project.key" /><h1 dir="auto">{{ bug.title }}</h1><div class="detail-identity__meta"><UserIdentity :name="bug.reporter.display_name" :active="bug.reporter.active" compact /><span>ثبت: {{ formatDateTime(bug.created_at) }}</span><span>به‌روزرسانی: {{ formatDateTime(bug.updated_at) }}</span></div><div v-if="bug.tags.length" class="detail-tags"><UBadge v-for="tag in bug.tags" :key="tag.id" color="neutral" variant="subtle">{{ tag.name }}</UBadge></div></header>
+      <section class="state-strip" aria-label="وضعیت فعلی باگ"><div><span>وضعیت</span><BugStatusBadge :status="bug.status" /></div><div><span>مسئول</span><UserIdentity v-if="bug.assignee" :name="bug.assignee.display_name" :active="bug.assignee.active" compact /><em v-else>بدون مسئول</em></div><div><span>اولویت / شدت</span><strong>{{ bug.priority?.name || 'تعیین‌نشده' }} <small> / </small> {{ bug.severity?.name || 'تعیین‌نشده' }}</strong></div><div><span>نتیجهٔ رفع / QA</span><template v-if="bug.active_resolution"><ResolutionOutcomeBadge :outcome="bug.active_resolution.outcome" /><UBadge v-if="bug.active_resolution.qa_result" :color="bug.active_resolution.qa_result.decision === 'approved' ? 'success' : 'error'" variant="subtle">{{ bug.active_resolution.qa_result.decision === 'approved' ? 'QA تأیید کرد' : 'QA رد کرد' }}</UBadge><em v-else>در انتظار تصمیم QA</em></template><button v-else class="state-strip__link" type="button" @click="selectedTab = 'attempts'">بدون نتیجهٔ رفع فعال</button></div></section>
+      <section v-if="bug.open_information_request" class="information-request"><h2>درخواست اطلاعات باز</h2><p dir="auto">{{ bug.open_information_request.request_text }}</p><small><UserIdentity :name="bug.open_information_request.requested_by.display_name" :active="bug.open_information_request.requested_by.active" compact /> · {{ formatDateTime(bug.open_information_request.requested_at) }}</small></section><UAlert v-else-if="bug.status === 'needs_information'" color="warning" variant="subtle" title="درخواست اطلاعات باز در پاسخ فعلی وجود ندارد." description="برای دریافت وضعیت تازه، گزارش را به‌روزرسانی کنید." />
+      <p v-if="handoff" class="detail-handoff">{{ handoff }}</p><UAlert v-if="success" color="success" variant="subtle" :title="success" class="detail-feedback" /><UAlert v-if="error && bug" color="error" variant="subtle" :title="error" class="detail-feedback"><template #actions><UButton size="xs" color="error" variant="outline" @click="refreshCurrentBug">تازه‌سازی</UButton></template></UAlert>
+      <section v-if="actionGroups.length" class="actions-region" aria-label="اقدامات موجود"><div class="actions-region__heading"><h2>اقدامات موجود</h2><UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-refresh-cw" @click="refreshCurrentBug">تازه‌سازی</UButton></div><div class="actions-region__groups"><div v-for="group in actionGroups" :key="group.label" class="action-group"><span>{{ group.label }}</span><UButton v-for="action in group.actions" :key="action" size="sm" color="neutral" :variant="activeAction === action ? 'soft' : 'outline'" @click="selectAction(action)">{{ actionLabels[action] || action }}</UButton></div></div><div v-if="activeAction" class="action-workspace"><div class="action-workspace__top"><strong>{{ actionLabels[activeAction] || activeAction }}</strong><UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-x" aria-label="بستن اقدام" @click="activeAction = null; editing = false" /></div><div v-if="editing"><BugForm mode="edit" :allowed-actions="bug.allowed_actions" :initial-value="bugToForm(bug)" :tracking-values="trackingValues" :field-errors="fieldErrors" :error="error" :pending="pending" @submit="update" /><UButton color="neutral" variant="ghost" :disabled="pending" @click="editing = false; activeAction = null">انصراف</UButton></div><AssignmentPanel v-else-if="activeAction === 'assign'" :bug="bug" @changed="refreshAfterCommand" /><TriagePanel v-else-if="triageAction(activeAction)" :bug="bug" :active-action="activeAction" @changed="refreshAfterCommand" /><ResolutionPanel v-else-if="developmentAction(activeAction)" :bug="bug" :active-action="activeAction" @changed="refreshAfterCommand" @refresh="refreshCurrentBug" /><VerificationPanel v-else-if="activeAction === 'verify'" :bug="bug" @changed="refreshAfterCommand" @refresh="refreshCurrentBug" /><BugStatusPanel v-else-if="lifecycleAction(activeAction)" :bug="bug" :active-action="activeAction" @changed="refreshAfterCommand" @refresh="refreshCurrentBug" /><div v-else-if="activeAction === 'start_work'" class="single-command"><p>کار به مسئول فعلی واگذار می‌شود و وضعیت به «در حال انجام» تغییر می‌کند.</p><UButton :loading="pending" @click="startWork">شروع کار</UButton></div></div></section><p v-else class="detail-readonly">این باگ برای دسترسی فعلی شما فقط قابل مشاهده است.</p>
+      <section class="detail-main-grid"><article class="report-region"><h2>گزارش</h2><section><h3>توضیحات</h3><p dir="auto">{{ bug.description }}</p></section><section v-if="bug.steps_to_reproduce"><h3>مراحل بازتولید</h3><p dir="auto">{{ bug.steps_to_reproduce }}</p></section><div v-if="bug.expected_result || bug.actual_result" class="report-region__pair"><section v-if="bug.expected_result"><h3>نتیجهٔ مورد انتظار</h3><p dir="auto">{{ bug.expected_result }}</p></section><section v-if="bug.actual_result"><h3>نتیجهٔ فعلی</h3><p dir="auto">{{ bug.actual_result }}</p></section></div><section v-if="bug.environment"><h3>محیط</h3><p dir="auto">{{ bug.environment }}</p></section></article><aside class="metadata-region"><h2>اطلاعات عملیاتی</h2><dl><div><dt>گزارش‌دهنده</dt><dd><UserIdentity :name="bug.reporter.display_name" :active="bug.reporter.active" compact /></dd></div><div><dt>مسئول</dt><dd><UserIdentity v-if="bug.assignee" :name="bug.assignee.display_name" :active="bug.assignee.active" compact /><em v-else>بدون مسئول</em></dd></div><div><dt>دسته‌بندی</dt><dd>{{ bug.category?.name || 'تعیین‌نشده' }}</dd></div><div><dt>اولویت</dt><dd>{{ bug.priority?.name || 'تعیین‌نشده' }}</dd></div><div><dt>شدت</dt><dd>{{ bug.severity?.name || 'تعیین‌نشده' }}</dd></div><div><dt>سکو</dt><dd>{{ bug.platform || 'تعیین‌نشده' }}</dd></div><div><dt>نسخهٔ برنامه</dt><dd><TechnicalValue v-if="bug.application_version" :value="bug.application_version" /><em v-else>تعیین‌نشده</em></dd></div><div><dt>شناسه</dt><dd><TechnicalValue :value="bug.public_id" /></dd></div></dl></aside></section>
+      <section v-if="bug.active_resolution" class="active-resolution"><h2>نتیجهٔ رفع فعال</h2><ResolutionAttemptSummary :attempt="bug.active_resolution" active /><p v-if="!bug.active_resolution.qa_result" class="active-resolution__note">ثبت نتیجهٔ رفع به‌تنهایی باگ را نمی‌بندد؛ تصمیم QA جداگانه است.</p></section><section v-else-if="bug.status === 'reopened'" class="active-resolution active-resolution--quiet"><h2>نتیجهٔ رفع فعال</h2><p>نتیجهٔ رفع فعال وجود ندارد. پاک‌شدن اشاره‌گر پس از رد QA مورد انتظار است؛ تلاش‌های پیشین حفظ شده‌اند.</p><ResolutionAttemptSummary v-if="latestRejectedAttempt" :attempt="latestRejectedAttempt" /></section>
+      <section class="supporting-region"><nav class="supporting-tabs" aria-label="رکورد پشتیبان"><button :class="{ active: selectedTab === 'attachments' }" type="button" @click="selectedTab = 'attachments'">پیوست‌ها</button><button :class="{ active: selectedTab === 'relationships' }" type="button" @click="selectedTab = 'relationships'">ارتباط‌ها</button><button :class="{ active: selectedTab === 'attempts' }" type="button" @click="selectedTab = 'attempts'">تلاش‌های رفع <span>{{ bug.resolution_attempts.length }}</span></button><button :class="{ active: selectedTab === 'activity' }" type="button" @click="selectedTab = 'activity'">تاریخچه</button></nav><div class="supporting-content"><AttachmentPanel v-if="selectedTab === 'attachments'" embedded :bug="bug" @changed="traceabilityRevision += 1" /><RelationshipPanel v-else-if="selectedTab === 'relationships'" :bug="bug" @changed="traceabilityRevision += 1" /><div v-else-if="selectedTab === 'attempts'" class="attempts-tab"><p v-if="!bug.resolution_attempts.length" class="detail-empty">هنوز تلاش رفعی ثبت نشده است.</p><ResolutionAttemptSummary v-for="attempt in bug.resolution_attempts" v-else :key="attempt.id" :attempt="attempt" :active="bug.active_resolution?.id === attempt.id" /></div><ActivityTimeline v-else :bug-id="bug.public_id" :refresh-key="traceabilityRevision" /></div></section>
     </template>
   </main>
 </template>
+
+<style scoped>
+.detail-page{margin:0 auto;max-width:1600px;padding:1.5rem}.detail-skeleton{display:grid;gap:1rem}.detail-skeleton__strip,.state-strip{border:1px solid var(--ui-border);display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.detail-skeleton__body,.detail-main-grid{display:grid;gap:2rem;grid-template-columns:minmax(0,2fr) minmax(15rem,1fr)}.detail-skeleton__strip>*{margin:.8rem}.detail-unavailable{display:grid;gap:1rem;max-width:32rem}.detail-unavailable>div{display:flex;flex-wrap:wrap;gap:.5rem}.detail-identity{border-bottom:1px solid var(--ui-border);padding-bottom:1.25rem}.detail-identity h1{font-size:clamp(1.25rem,2vw,1.65rem);line-height:1.5;margin:.55rem 0}.detail-identity__meta,.detail-tags{color:var(--ui-text-muted);display:flex;flex-wrap:wrap;font-size:.78rem;gap:.45rem .9rem}.detail-tags{margin-top:.7rem}.state-strip{margin-top:1.25rem}.state-strip>div{display:grid;gap:.45rem;min-height:5.75rem;padding:.8rem 1rem}.state-strip>div+div{border-inline-start:1px solid var(--ui-border)}.state-strip span,.metadata-region dt{color:var(--ui-text-muted);font-size:.75rem}.state-strip strong{font-size:.86rem}.state-strip em,.metadata-region em{color:var(--ui-text-dimmed);font-style:normal}.state-strip__link{color:var(--ui-text-muted);font-size:.82rem;text-align:start;text-decoration:underline;text-underline-offset:.2rem}.information-request,.active-resolution{border-block:1px solid var(--ui-border);margin-top:1.25rem;padding:1rem 0}.information-request h2,.active-resolution h2,.actions-region h2,.report-region h2,.metadata-region h2{font-size:1rem;margin:0 0 .65rem}.information-request p{margin:0 0 .5rem;white-space:pre-wrap}.information-request small{color:var(--ui-text-muted)}.detail-handoff,.detail-readonly{color:var(--ui-text-muted);font-size:.85rem;margin:.8rem 0}.detail-feedback{margin-block:.75rem}.actions-region{border-block:1px solid var(--ui-border);margin-top:1rem;padding:1rem 0}.actions-region__heading,.action-workspace__top{align-items:center;display:flex;justify-content:space-between}.actions-region__groups{display:grid;gap:.65rem;margin-top:.75rem}.action-group{align-items:center;display:flex;flex-wrap:wrap;gap:.45rem}.action-group>span{color:var(--ui-text-muted);font-size:.73rem;min-width:4.75rem}.action-workspace{border-top:1px solid var(--ui-border);margin-top:1rem;padding-top:1rem}.action-workspace :deep(.bug-panel),.supporting-content :deep(.bug-panel){background:transparent;border:0;box-shadow:none;padding:0}.action-workspace :deep(.panel-title),.supporting-content :deep(.panel-title){margin-bottom:1rem}.single-command{display:grid;gap:.8rem;max-width:44rem}.single-command p{color:var(--ui-text-muted);margin:0}.detail-main-grid{margin-top:2rem}.report-region{min-width:0}.report-region>section,.report-region__pair{border-top:1px solid var(--ui-border);padding:1rem 0}.report-region h3{font-size:.85rem;margin:0 0 .5rem}.report-region p{line-height:1.8;margin:0;max-width:75ch;overflow-wrap:anywhere;white-space:pre-wrap}.report-region__pair{display:grid;gap:1.5rem;grid-template-columns:repeat(2,minmax(0,1fr))}.report-region__pair section{min-width:0}.metadata-region{align-self:start;border-inline-start:1px solid var(--ui-border);padding-inline-start:1.25rem}.metadata-region dl{display:grid;gap:.75rem;margin:0}.metadata-region dl>div{display:grid;gap:.2rem}.metadata-region dd{margin:0;overflow-wrap:anywhere}.active-resolution__note{color:var(--ui-text-muted);font-size:.82rem;margin:.5rem 0 0}.active-resolution--quiet p{color:var(--ui-text-muted)}.supporting-region{border-top:1px solid var(--ui-border);margin-top:2rem}.supporting-tabs{display:flex;overflow-x:auto}.supporting-tabs button{border-bottom:2px solid transparent;color:var(--ui-text-muted);flex:0 0 auto;font-size:.85rem;padding:.9rem 1rem}.supporting-tabs button.active{border-color:var(--ui-primary);color:var(--ui-text-highlighted)}.supporting-tabs span{color:var(--ui-text-dimmed);font-size:.72rem}.supporting-content{border-top:1px solid var(--ui-border);padding-top:1rem}.attempts-tab{display:grid}.detail-empty{color:var(--ui-text-muted);margin:0}@media(max-width:1024px){.detail-main-grid{grid-template-columns:minmax(0,1.4fr) minmax(14rem,1fr)}}@media(max-width:767px){.detail-page{padding:1rem}.state-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.state-strip>div:nth-child(3){border-inline-start:0;border-top:1px solid var(--ui-border)}.state-strip>div:nth-child(4){border-top:1px solid var(--ui-border)}.detail-main-grid,.detail-skeleton__body{grid-template-columns:1fr;gap:1.5rem}.metadata-region{border-inline-start:0;border-top:1px solid var(--ui-border);padding:1rem 0 0}.report-region__pair{grid-template-columns:1fr;gap:0}.action-group{align-items:stretch}.action-group>span{flex:0 0 100%}.action-group :deep(button){flex:1 1 calc(50% - .3rem);min-height:2.75rem}.supporting-tabs button{padding-inline:.8rem}}
+</style>

@@ -48,9 +48,9 @@ async function submit() {
       <label for="bug-assignee">توسعه‌دهنده واجد شرایط</label>
       <select id="bug-assignee" v-model="assigneeId" :disabled="loading || pending" required :aria-invalid="!!fieldErrors.assignee_id" aria-describedby="bug-assignee-error">
         <option value="" disabled>{{ loading ? 'در حال بارگیری توسعه‌دهندگان…' : 'توسعه‌دهنده را انتخاب کنید' }}</option>
-        <option v-for="membership in candidates" :key="membership.id" :value="membership.user_id">{{ membership.user_id }}{{ membership.user_id === bug.assignee?.id ? ' (فعلی)' : '' }}</option>
+        <option v-for="membership in candidates" :key="membership.id" :value="membership.user_id">{{ membership.user_display_name }} · {{ membership.user_id }}{{ membership.user_id === bug.assignee?.id ? ' (فعلی)' : '' }}</option>
       </select>
-      <p class="muted candidate-note">API عضویت، شناسه کاربر را نمایش می‌دهد. واجد شرایط بودن توسعه‌دهنده فعال در همان پروژه، در سرور بررسی می‌شود.</p>
+      <p class="muted candidate-note">نام عضو و شناسهٔ فنی او از منبع عضویت نمایش داده می‌شود. واجد شرایط بودن در سرور بررسی می‌شود.</p>
       <p v-if="fieldErrors.assignee_id?.[0]" id="bug-assignee-error" class="field-error">{{ fieldErrors.assignee_id[0] }}</p>
       <button class="button button-primary workflow-button" :disabled="loading || pending || !assigneeId">{{ pending ? 'در حال تخصیص…' : bug.assignee ? 'تخصیص مجدد توسعه‌دهنده' : 'تخصیص توسعه‌دهنده' }}</button>
     </form>

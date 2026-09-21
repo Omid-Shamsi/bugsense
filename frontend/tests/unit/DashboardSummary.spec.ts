@@ -1,7 +1,21 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import DashboardSummary from '../../app/components/dashboard/DashboardSummary.vue'
-import type { DashboardData } from '../../app/composables/useBugFilters'
+import { createBugFilterState, type DashboardData } from '../../app/composables/useBugFilters'
+
+const filters = createBugFilterState()
+const stubs = {
+  UAlert: { props: ['title', 'description'], template: '<div><span>{{ title }}</span><span>{{ description }}</span><slot /><slot name="actions" /></div>' },
+  UButton: { template: '<button><slot /></button>' },
+  USkeleton: { template: '<div />' },
+  UIcon: { template: '<i />' },
+  RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' },
+  TechnicalValue: { props: ['value'], template: '<span>{{ value }}</span>' },
+}
+
+function mountSummary(props: Record<string, unknown>) {
+  return mount(DashboardSummary, { props, global: { stubs } })
+}
 
 function summary(overrides: Partial<DashboardData> = {}): DashboardData {
   return {
@@ -25,25 +39,24 @@ function summary(overrides: Partial<DashboardData> = {}): DashboardData {
 }
 
 describe('DashboardSummary', () => {
-  it('renders loading and problem states with retry', async () => {
-    const loading = mount(DashboardSummary, { props: { summary: null, loading: true, error: '' } })
+  it('renders loading and error states with retry', async () => {
+    const loading = mountSummary({ summary: null, loading: true, error: '', filters })
     expect(loading.text()).toContain('در حال بارگیری داشبورد')
 
-    const problem = mount(DashboardSummary, { props: { summary: null, loading: false, error: 'Dashboard unavailable.' } })
+    const problem = mountSummary({ summary: null, loading: false, error: 'Dashboard unavailable.', filters })
     expect(problem.text()).toContain('Dashboard unavailable.')
     await problem.get('button').trigger('click')
     expect(problem.emitted('retry')).toHaveLength(1)
   })
 
-  it('renders a zero-result summary as empty and zero samples as no data', () => {
-    const wrapper = mount(DashboardSummary, { props: { summary: summary(), loading: false, error: '' } })
+  it('renders a filtered zero-result summary as compact empty state', () => {
+    const wrapper = mountSummary({ summary: summary(), loading: false, error: '', filters, filtered: true })
 
-    expect(wrapper.text()).toContain('باگی با این فیلترها مطابقت ندارد')
-    expect(wrapper.text()).toContain('نمونه تکمیل‌شده‌ای وجود ندارد')
+    expect(wrapper.text()).toContain('باگی با این جستجو و فیلترها مطابقت ندارد')
     expect(wrapper.text()).not.toContain('0 ms')
   })
 
-  it('formats valid resolution milliseconds and retains server unset buckets', () => {
+  it('formats duration, retains unset buckets, and links supported drill-downs', () => {
     const data = summary({
       counts: { ...summary().counts, total: 3, open: 2 },
       breakdowns: {
@@ -54,11 +67,13 @@ describe('DashboardSummary', () => {
       },
       average_resolution_time: { sample_count: 2, milliseconds: 5_400_000, included_outcomes: ['fixed'] },
     })
-    const wrapper = mount(DashboardSummary, { props: { summary: data, loading: false, error: '' } })
+    const wrapper = mountSummary({ summary: data, loading: false, error: '', filters })
 
     expect(wrapper.text()).toContain('۱ ساعت ۳۰ دقیقه')
     expect(wrapper.text()).toContain('۲ نمونه')
     expect(wrapper.text()).toContain('تعیین‌نشده')
     expect(wrapper.text()).toContain('بدون مسئول')
+    expect(wrapper.html()).toContain('project')
+    expect(wrapper.html()).toContain('unassigned')
   })
 })

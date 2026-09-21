@@ -79,6 +79,9 @@ const arrayKeys = ['project', 'status', 'severity', 'priority', 'category', 'rep
 const dateKeys = ['created_from', 'created_to', 'updated_from', 'updated_to'] as const
 const sorts: BugSort[] = ['created_at', 'updated_at', 'priority', 'severity', 'public_id']
 
+export const bugStatuses: BugStatusFilter[] = ['submitted', 'review', 'needs_information', 'assigned', 'in_progress', 'resolved', 'qa_verification', 'reopened', 'closed']
+export const bugSorts: BugSort[] = sorts
+
 export function createBugFilterState(): BugFilterState {
   return {
     q: '',
@@ -192,6 +195,13 @@ export function filtersToRouteQuery(filters: BugFilterState, mode: FilterMode): 
     if (value !== null) query[key] = value
   }
   return query
+}
+
+export function hasActiveBugQuery(filters: BugFilterState): boolean {
+  if (filters.q.trim()) return true
+  for (const key of arrayKeys) if (filters[key].length) return true
+  for (const key of dateKeys) if (filters[key]) return true
+  return false
 }
 
 export function getBugListState(loading: boolean, error: string, resultCount: number): BugListState {

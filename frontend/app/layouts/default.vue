@@ -35,7 +35,7 @@ const navigation = computed<NavigationMenuItem[]>(() => [{
 }, {
   label: 'مدیریت',
   icon: 'i-lucide-settings-2',
-  to: '/admin',
+  to: '/projects',
   onSelect: closeSidebar
 }])
 
@@ -49,6 +49,9 @@ const pageTitle = computed(() => {
   if (route.path.startsWith('/admin/projects/')) return 'مدیریت پروژه'
   if (route.path === '/admin/users') return 'مدیریت کاربران'
   if (route.path.startsWith('/admin')) return 'مدیریت'
+  if (route.path === '/projects') return 'پروژه‌ها'
+  if (route.path.startsWith('/projects/')) return 'پروژه'
+  if (route.path === '/users') return 'کاربران'
   return 'BugSense'
 })
 
@@ -118,6 +121,7 @@ async function signOut() {
           popover
           class="sidebar-navigation"
         />
+        <NuxtLink v-if="session.user.value?.is_system_admin && !collapsed" to="/users" class="sidebar-users-link">کاربران</NuxtLink>
       </template>
 
       <template #footer="{ collapsed }">

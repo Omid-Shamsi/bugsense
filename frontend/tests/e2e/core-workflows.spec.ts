@@ -41,7 +41,6 @@ async function rolePage(browser: Browser, role: SessionName): Promise<{ context:
 async function createBug(page: Page, projectId: string, title: string, description: string): Promise<string> {
   await page.goto('/bugs/new')
   await expect(page.getByRole('heading', { name: 'ثبت باگ' })).toBeVisible()
-  await page.getByLabel('پروژه', { exact: true }).selectOption(projectId)
   await page.getByLabel('عنوان').fill(title)
   await page.getByLabel('توضیحات', { exact: true }).fill(description)
   await page.getByRole('button', { name: 'ثبت باگ' }).click()
@@ -96,19 +95,19 @@ test.describe('BugSense essential core journeys', () => {
     const { context, page } = await rolePage(browser, 'reporter')
     try {
       await page.goto('/bugs/new')
-      await page.getByLabel('پروژه', { exact: true }).selectOption(data.primaryProject.id)
       await page.getByRole('button', { name: 'ثبت باگ' }).click()
-      await expect(page.getByText('The title field is required.', { exact: true })).toBeVisible()
-      await expect(page.getByText('The description field is required.', { exact: true })).toBeVisible()
+      await expect(page.getByText('عنوان باگ الزامی است.', { exact: true })).toBeVisible()
+      await expect(page.getByText('توضیحات باگ الزامی است.', { exact: true })).toBeVisible()
 
       await page.getByLabel('عنوان').fill(lifecycleTitle)
       await page.getByLabel('توضیحات', { exact: true }).fill('A deterministic browser-created report for the complete role lifecycle.')
       await page.getByLabel('مراحل بازتولید').fill('1. Open BugSense\n2. Follow the lifecycle')
-      await page.getByLabel('نتیجه مورد انتظار').fill('The lifecycle completes through independent QA.')
-      await page.getByLabel('نتیجه فعلی').fill('The report begins in Submitted.')
+      await page.getByLabel(/نتیجه.*مورد انتظار/).fill('The lifecycle completes through independent QA.')
+      await page.getByLabel(/نتیجه.*فعلی/).fill('The report begins in Submitted.')
       await page.getByLabel('محیط', { exact: true }).fill('Chromium Playwright')
       await page.getByLabel('سکو').fill('Windows')
-      await page.getByLabel('نسخه برنامه').fill('T060')
+      await page.getByLabel(/نسخه.*برنامه/).fill('T060')
+      await page.locator('input[type="file"]').setInputFiles(evidencePath)
       await page.getByRole('button', { name: 'ثبت باگ' }).click()
       await expect(page).toHaveURL(/\/bugs\/BUG-\d+$/)
       const publicIdHeading = page.getByRole('heading', { level: 1, name: /^BUG-\d+$/ })
@@ -125,8 +124,6 @@ test.describe('BugSense essential core journeys', () => {
       lifecycleTitle = editedTitle
 
       const attachmentPanel = page.locator('section').filter({ has: page.getByRole('heading', { name: 'پیوست‌ها' }) })
-      await attachmentPanel.getByLabel('افزودن مدرک').setInputFiles(evidencePath)
-      await attachmentPanel.getByRole('button', { name: 'بارگذاری مدرک' }).click()
       await expect(attachmentPanel.getByText(evidenceName, { exact: true })).toBeVisible()
 
       const downloadEvent = page.waitForEvent('download')
@@ -287,8 +284,8 @@ test.describe('BugSense essential core journeys', () => {
 
       await reporterSession.page.goto('/bugs')
       await reporterSession.page.getByLabel('جستجو').fill(lifecycleTitle)
-      await reporterSession.page.getByRole('button', { name: 'اعمال فیلترها' }).click()
-      await expect(reporterSession.page.getByRole('link', { name: lifecycleBugId, exact: true })).toBeVisible()
+      await reporterSession.page.getByRole('button', { name: 'اعمال', exact: true }).click()
+      await expect(reporterSession.page.getByRole('link', { name: new RegExp(lifecycleBugId) })).toBeVisible()
 
       await reporterSession.page.goto('/dashboard')
       await expect(reporterSession.page.getByRole('heading', { name: 'داشبورد', exact: true })).toBeVisible()

@@ -135,7 +135,7 @@ watch(() => [props.bugId, props.refreshKey], () => { void load() }, { immediate:
 
       <div v-if="canLoadMore" class="timeline-more">
         <button class="button button-secondary" type="button" :disabled="loadingMore" @click="load((meta?.current_page || 0) + 1, true)">
-          {{ loadingMore ? 'در حال بارگیری…' : 'بارگیری فعالیت‌های بیشتر' }}
+          {{ loadingMore ? 'در حال بارگیری…' : 'بارگیری رویدادهای جدیدتر' }}
         </button>
       </div>
     </template>

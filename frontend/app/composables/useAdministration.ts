@@ -2,7 +2,7 @@ import type { ApiError } from '~/plugins/api.client'
 
 export interface AdminProject { id: string; key: string; name: string; description: string | null; active: boolean }
 export interface AdminUser { id: string; email: string; display_name: string; is_system_admin: boolean; active: boolean; created_at: string; updated_at: string }
-export interface AdminMembership { id: string; project_id: string; user_id: string; roles: string[]; active: boolean }
+export interface AdminMembership { id: string; project_id: string; user_id: string; user_display_name: string; roles: string[]; active: boolean }
 export interface AdminTrackingValue { id: string; project_id: string; kind: TrackingKind; code: string; name: string; rank: number | null; active: boolean }
 export type TrackingKind = 'category' | 'priority' | 'severity' | 'tag' | 'resolution_label'
 export interface ApiCollection<T> { data: T[]; meta?: { current_page: number; last_page: number; per_page: number; total: number } }
@@ -26,7 +26,8 @@ export function useAdministration() {
   const api = useApi()
 
   return {
-    listUsers: (q = '', page = 1) => api.request<ApiCollection<AdminUser>>('/users', { query: { q: q || undefined, page, per_page: 25 } }),
+    listProjects: () => api.request<{ data: AdminProject[] }>('/projects'),
+    listUsers: (q = '', page = 1, perPage = 25) => api.request<ApiCollection<AdminUser>>('/users', { query: { q: q || undefined, page, per_page: perPage } }),
     createUser: (data: Pick<AdminUser, 'email' | 'display_name'> & { password: string; is_system_admin: boolean }) => api.request<{ data: AdminUser }>('/users', { method: 'POST', body: data }),
     updateUser: (id: string, data: Partial<Pick<AdminUser, 'email' | 'display_name' | 'is_system_admin' | 'active'>> & { password?: string; remediation?: AssignmentRemediation }) => api.request<{ data: AdminUser }>(`/users/${id}`, { method: 'PATCH', body: data }),
     createProject: (data: Pick<AdminProject, 'key' | 'name' | 'description'>) => api.request<{ data: AdminProject }>('/projects', { method: 'POST', body: data }),
