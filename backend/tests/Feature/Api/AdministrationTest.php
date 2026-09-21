@@ -151,6 +151,58 @@ it('rejects creating a second membership for the same user in the same project',
     $response->assertStatus(409);
 });
 
+it('presents membership users by display name without exposing administrative user data', function () {
+    $project = Project::factory()->create();
+    $actor = User::factory()->create();
+    Membership::factory()->for($project)->for($actor)->withRole(Role::Admin)->create();
+    $developer = User::factory()->create([
+        'display_name' => 'Dana Developer',
+        'email' => 'dana@example.com',
+        'is_system_admin' => true,
+    ]);
+    $membership = Membership::factory()->for($project)->for($developer)->withRole(Role::Developer)->create();
+
+    $response = $this->actingAs($actor)->getJson("/api/v1/projects/{$project->key}/memberships");
+
+    $response->assertOk();
+    $row = collect($response->json('data'))->firstWhere('id', $membership->id);
+    expect($row)->toMatchArray([
+        'id' => $membership->id,
+        'project_id' => $project->id,
+        'user_id' => $developer->id,
+        'user_display_name' => 'Dana Developer',
+        'roles' => ['developer'],
+        'active' => true,
+    ]);
+    expect($row)->not->toHaveKeys([
+        'email',
+        'password',
+        'remember_token',
+        'is_system_admin',
+        'created_at',
+        'updated_at',
+        'user',
+    ]);
+});
+
+it('returns the user display name when creating a membership', function () {
+    $project = Project::factory()->create();
+    $actor = User::factory()->create();
+    Membership::factory()->for($project)->for($actor)->withRole(Role::Admin)->create();
+    $reporter = User::factory()->create(['display_name' => 'Riley Reporter']);
+
+    $response = $this->actingAs($actor)->postJson("/api/v1/projects/{$project->key}/memberships", [
+        'user_id' => $reporter->id,
+        'roles' => ['reporter'],
+    ]);
+
+    $response->assertCreated();
+    $response->assertJsonPath('data.user_id', $reporter->id);
+    $response->assertJsonPath('data.user_display_name', 'Riley Reporter');
+    $response->assertJsonPath('data.roles', ['reporter']);
+    $response->assertJsonPath('data.active', true);
+});
+
 it('reconciles a membership role set on update, granting and revoking in one request', function () {
     $project = Project::factory()->create();
     $membership = Membership::factory()->for($project)->withRole(Role::Reporter)->create();
@@ -162,6 +214,7 @@ it('reconciles a membership role set on update, granting and revoking in one req
 
     $response->assertOk();
     $response->assertJsonPath('data.roles', ['developer', 'qa']);
+    $response->assertJsonPath('data.user_display_name', $membership->user->display_name);
 
     $roles = $membership->fresh()->roles()->pluck('role', 'is_active');
     expect($membership->fresh()->activeRoles()->count())->toBe(2);

@@ -50,7 +50,7 @@ class TrackingValueController extends AdministrationController
         $data = $request->validated();
 
         if (($data['active'] ?? null) === false) {
-            $trackingValue = $deactivateAction->handle($request->user(), $trackingValue);
+            $trackingValue = $deactivateAction->handle($request->user(), $trackingValue, (array) $request->input('remediation', []));
         } else {
             $trackingValue = $this->runOrConflict(
                 fn () => $action->handle($request->user(), $trackingValue, $data),

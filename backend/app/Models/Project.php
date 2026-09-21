@@ -50,6 +50,11 @@ class Project extends Model
         return $this->hasMany(TrackingValue::class);
     }
 
+    public function bugs(): HasMany
+    {
+        return $this->hasMany(Bug::class);
+    }
+
     public function deactivatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'deactivated_by_id');

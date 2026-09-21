@@ -2,23 +2,38 @@
 
 namespace App\Actions\Administration;
 
+use App\Actions\Administration\Concerns\RemediatesBugAssignments;
 use App\Actions\Concerns\RecordsActivity;
+use App\Enums\Role;
+use App\Models\Bug;
 use App\Models\MembershipRole;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class DeactivateMembershipRole
 {
-    use RecordsActivity;
+    use RecordsActivity, RemediatesBugAssignments;
 
     /**
-     * No open Bug work can reference an assignee-eligible role yet (the Bug
-     * domain does not exist in this phase), so there is no remediation to
-     * enforce here. A later phase (T032) extends this once assignment exists.
+     * @param  array<string, mixed>  $remediation
      */
-    public function handle(User $actor, MembershipRole $role): MembershipRole
+    public function handle(User $actor, MembershipRole $role, array $remediation = []): MembershipRole
     {
-        return DB::transaction(function () use ($actor, $role) {
+        return DB::transaction(function () use ($actor, $role, $remediation) {
+            if ($role->role === Role::Developer) {
+                $affectedBugs = Bug::open()
+                    ->where('assignee_membership_id', $role->membership_id)
+                    ->lockForUpdate()
+                    ->get();
+
+                $this->remediateAssignments(
+                    $actor,
+                    $affectedBugs,
+                    $remediation,
+                    'Remediation for deactivated Developer role.',
+                );
+            }
+
             $before = $role->only(['is_active']);
 
             $role->is_active = false;

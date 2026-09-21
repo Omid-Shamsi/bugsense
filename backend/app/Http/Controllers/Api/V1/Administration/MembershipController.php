@@ -18,7 +18,7 @@ class MembershipController extends AdministrationController
     {
         $this->authorize('viewAny', [Membership::class, $project]);
 
-        $memberships = $project->memberships()->with('roles')->get();
+        $memberships = $project->memberships()->with(['roles', 'user'])->get();
 
         return MembershipResource::collection($memberships);
     }
@@ -32,7 +32,7 @@ class MembershipController extends AdministrationController
             'This user already has a membership in this project.',
         );
 
-        return MembershipResource::make($membership)->response()->setStatusCode(201);
+        return MembershipResource::make($membership->loadMissing('user'))->response()->setStatusCode(201);
     }
 
     public function update(
@@ -46,12 +46,13 @@ class MembershipController extends AdministrationController
         $data = $request->validated();
 
         if (($data['active'] ?? null) === false) {
-            $membership = $deactivateAction->handle($request->user(), $membership);
+            $membership = $deactivateAction->handle($request->user(), $membership, (array) $request->input('remediation', []));
         } else {
+            $data['remediation'] = (array) $request->input('remediation', []);
             $membership = $action->handle($request->user(), $membership, $data);
         }
 
-        return MembershipResource::make($membership->load('roles'));
+        return MembershipResource::make($membership->load(['roles', 'user']));
     }
 
     public function destroy(Request $request, Membership $membership)

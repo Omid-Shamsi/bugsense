@@ -9,16 +9,22 @@
     "preview": "nuxt preview",
     "typecheck": "nuxi typecheck",
     "test:unit": "vitest run",
+    "test:e2e": "playwright test --project=chromium",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@fontsource-variable/vazirmatn": "^5.3.0",
+    "@iconify-json/lucide": "^1.2.131",
+    "@nuxt/ui": "^4.11.1",
     "nuxt": "^4.5.2",
+    "tailwindcss": "^4.3.3",
     "vue": "^3.5.42",
     "vue-router": "^5.3.1"
   },
   "devDependencies": {
     "@nuxt/test-utils": "^4.3.2",
     "@playwright/test": "^1.63.0",
+    "@vitejs/plugin-vue": "^6.0.9",
     "@vue/test-utils": "^2.5.0",
     "happy-dom": "^20.14.5",
     "typescript": "^6.0.3",

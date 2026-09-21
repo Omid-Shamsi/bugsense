@@ -18,6 +18,7 @@ class MembershipResource extends JsonResource
             'id' => $this->id,
             'project_id' => $this->project_id,
             'user_id' => $this->user_id,
+            'user_display_name' => $this->user->display_name,
             'roles' => $this->relationLoaded('roles')
                 ? $this->roles->where('is_active', true)->pluck('role')->map(fn (Role $role) => $role->value)->values()
                 : $this->activeRoles()->pluck('role')->map(fn (Role $role) => $role->value)->values(),

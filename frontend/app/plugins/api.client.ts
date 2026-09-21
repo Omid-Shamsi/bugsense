@@ -32,7 +32,7 @@ export class ApiError extends Error {
     public readonly status?: number,
     public readonly problem?: ApiProblem,
   ) {
-    super(problem?.detail || problem?.title || 'Unable to complete request.')
+    super(problem?.detail || problem?.title || 'انجام درخواست امکان‌پذیر نبود.')
     this.name = 'ApiError'
   }
 

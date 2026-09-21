@@ -20,6 +20,20 @@ class Authorization
 
     public static function isProjectAdmin(User $user, Project $project): bool
     {
+        return static::hasActiveRole($user, $project, Role::Admin);
+    }
+
+    public static function isAdminWithinScope(User $user, Project $project): bool
+    {
+        return static::isSystemAdmin($user) || static::isProjectAdmin($user, $project);
+    }
+
+    /**
+     * True when the user has a current, active membership in the project
+     * carrying the given active role. Always re-derived from the database.
+     */
+    public static function hasActiveRole(User $user, Project $project, Role $role): bool
+    {
         if (! $user->is_active || ! $project->is_active) {
             return false;
         }
@@ -29,11 +43,6 @@ class Authorization
             ->where('is_active', true)
             ->first();
 
-        return $membership !== null && $membership->hasActiveRole(Role::Admin);
-    }
-
-    public static function isAdminWithinScope(User $user, Project $project): bool
-    {
-        return static::isSystemAdmin($user) || static::isProjectAdmin($user, $project);
+        return $membership !== null && $membership->hasActiveRole($role);
     }
 }

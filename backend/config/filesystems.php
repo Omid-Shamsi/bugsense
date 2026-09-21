@@ -33,7 +33,26 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Never auto-serve: the 'attachments' disk below lives inside
+            // this same root, and Laravel's serve-route has no concept of
+            // per-subdirectory authorization — it would otherwise expose
+            // every private attachment at a guessable, unauthenticated
+            // /storage/... URL (research.md §8: "Never use the public disk
+            // or storage:link"). All access instead goes through
+            // AttachmentController, which re-checks live Bug visibility.
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
+        // Bug evidence bytes. Deliberately the same "local"/private family as
+        // the default disk above — never public, never storage:link'd, and
+        // never given a "url" — every read goes through AttachmentController,
+        // which re-checks live Bug visibility before streaming (research.md
+        // §8: "Never use the public disk or storage:link").
+        'attachments' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/attachments'),
             'throw' => false,
             'report' => false,
         ],

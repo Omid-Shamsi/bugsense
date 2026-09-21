@@ -4,8 +4,27 @@ export default defineNuxtConfig({
 
   ssr: false,
 
+  modules: ['@nuxt/ui'],
+
   devtools: {
     enabled: true
+  },
+
+  components: [{ path: '~/components', pathPrefix: false }],
+
+  app: {
+    head: {
+      htmlAttrs: { lang: 'fa', dir: 'rtl' }
+    }
+  },
+
+  colorMode: {
+    preference: 'dark',
+    fallback: 'dark'
+  },
+
+  ui: {
+    fonts: false
   },
 
   runtimeConfig: {
